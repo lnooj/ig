@@ -1,0 +1,14 @@
+name = "logic"
+version = "0.1.0"
+defaultTargets = ["logic"]
+
+[[lean_lib]]
+name = "Logic"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+
+[[lean_exe]]
+name = "logic"
+root = "Main"
