@@ -52,7 +52,7 @@ def sizeOf_Form : Form → Nat
 
 -- [f1,f2] ⊢ x
 inductive Sequent
-  | seq : (context : List Form) → Form → Sequent
+  | seq : List Form → Form → Sequent
 deriving Repr
 
 instance : ToString Sequent where
@@ -177,26 +177,43 @@ inductive Proof : Sequent → Type
 deriving Repr
 open Proof
 
-def proofToString {seq : Sequent} (proof : Proof seq) : String :=
-  match proof with
-  | .ax a xs ys => toString a ++ (List.map formToString xs).toString ++ (List.map formToString ys).toString ++ " ⊢ " ++ toString a
-  | .botl a xs ys => " ⊥ " ++ (List.map formToString xs).toString ++ (List.map formToString ys).toString ++ " ⊢ " ++ toString a
-  | .negr a xs proof => proofToString proof ++ " → ¬R: " ++(List.map formToString xs).toString ++  " ⊢ ¬" ++ formToString a
-  | .negl a b xs ys proof => proofToString proof ++ " → ¬L: " ++ "¬"++ formToString a ++(List.map formToString xs).toString ++ (List.map formToString ys).toString ++  " ⊢ " ++ formToString b
-  | .andl a b c xs ys proof => "not ready"
-  | .andr a b xs proof₁ proof₂=> "not ready"
-  | .orl a b c xs ys proof₁ proof₂=> "not ready"
-  | .orr1 a b xs proof₁ => "not ready"
-  | .orr2 a b xs proof₁ => "not ready"
-  | .impl a b c xs ys proof₁ proof₂ => "not ready"
-  | .impr a b xs proof₁  => "not ready"
+def listToString (xs : List Form) : String :=
+  String.intercalate ", " (xs.map formToString)
 
+
+def proofToString {seq : Sequent} : Proof seq → String
+| .ax a xs ys =>
+  s!"AX: {formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString a}"
+| .botl a xs ys =>
+  s!"⊥L: ⊥, {listToString xs}, {listToString ys} ⊢ {formToString a}"
+| .negr a xs proof =>
+  s!"{proofToString proof} '\n' ¬R: {listToString xs} ⊢ ¬{formToString a}"
+| .negl a b xs ys proof =>
+  s!"{proofToString proof} '\n' ¬L: ¬{formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString b}"
+| .andl a b c xs ys proof =>
+  s!"{proofToString proof} '\n' ∧L: ({formToString a} ∧ {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
+| .andr a b xs proof₁ proof₂=>
+  s!"{proofToString proof₁}    {proofToString proof₂} '\n' ∧R: {listToString xs} ⊢ {formToString a} ∧ {formToString b}"
+| .orl a b c xs ys proof₁ proof₂=>
+  s!"{proofToString proof₁}    {proofToString proof₂} '\n' ∨L: ({formToString a} ∨ {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
+| .orr1 a b xs proof =>
+  s!"{proofToString proof} '\n' ∨R₁: {listToString xs} ⊢ {formToString a} ∨ {formToString b}"
+| .orr2 a b xs proof =>
+  s!"{proofToString proof} '\n' ∨R₂: {listToString xs} ⊢ {formToString a} ∨ {formToString b}"
+| .impl a b c xs ys proof₁ proof₂ =>
+  s!"{proofToString proof₁}    {proofToString proof₂} '\n' →L: ({formToString a} → {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
+| .impr a b xs proof  =>
+  s!"{proofToString proof} '\n' →R: {listToString xs} ⊢ {formToString a} → {formToString b}"
 
 /-
 all ToString instances are for pretty-printing purposes
  -/
-instance : ToString (Proof seq) where
-  toString proof := proofToString proof
+def listProofToString : List (Proof seq) → String
+| [] => ""
+| x::xs => proofToString x ++ listProofToString xs
+
+instance : ToString (List (Proof seq)) where
+  toString proof := listProofToString proof
 
 
 /-
@@ -272,20 +289,36 @@ def seqAtoms2seq (s : Seq4Proof) : Sequent :=
   | .seq4 xs ys a =>
     Sequent.seq ((xs.map .atoms) ++ ys) a
 
+theorem maybe2 as ys x a:
+  termination_metric (Seq4Proof.seq4 as ys x) < 1 + sizeOf_Form x + termination_metric (Seq4Proof.seq4 as ys a) := by
+  match ys with
+  | [] =>
+    simp
+    have step1 : sizeOf_Form x < 1 + sizeOf_Form x := lt_one_add (sizeOf_Form x)
+    match sizeOf_Form a with
+    | 0 => exact step1
+    | n + 1 => exact Nat.lt_add_right (n + 1) step1
+  | b::bs =>
+    have ih := maybe2 bs (as:=as) (x:=x) (a:=a)
+    simp
+    simp at ih
+    have obv {a b : Nat} (c : Nat) : a < b → c + a < c + b := fun a_1 => Nat.add_lt_add_left a_1 c
+    have step := obv (sizeOf_Form b) ih
+    clear obv ih
+    have helper (b x tma : Nat) : b + ((1 + x) + tma) = (1 + x) + (b + tma) := by
+      conv => rhs; rw[←Nat.add_assoc (n:= 1 + x), Nat.add_comm (n:= 1 + x), Nat.add_assoc]
+    rw[←helper (b:=sizeOf_Form b)]
+    apply step
 
-theorem maybee {ys : List Form}  :
-  --let bs := List.map sizeOf_Form ys
-  termination_metric (Seq4Proof.seq4 as ys goal) = List.foldl (· + · ) 0 (List.map sizeOf_Form ys) + sizeOf_Form goal :=
-   by induction ys with
-   | nil => simp only [termination_metric, List.map_nil, List.foldl_nil, zero_add]
-   | cons y ys ih =>
-      simp only [termination_metric, List.map_cons, List.foldl_cons, zero_add]
-      rw [ih]
-      rw [← add_assoc, add_comm (sizeOf_Form y) _ , Nat.add_assoc, Nat.add_comm (sizeOf_Form y) (sizeOf_Form goal), ←Nat.add_assoc]
-      
-      sorry
-      --apply List.foldl_add_const
-
+theorem maybe3 as ys a:
+  termination_metric (Seq4Proof.seq4 (as ++ [x]) ys a) < 1 + termination_metric (Seq4Proof.seq4 as ys a) := by
+  match ys with
+  | [] => simp
+  | b::bs =>
+    have ih := maybe3 as bs a (x:=x)
+    simp
+    conv => rhs; rw[←Nat.add_assoc, Nat.add_comm 1, Nat.add_assoc]
+    apply add_lt_add_left ih (sizeOf_Form b)
 
 def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
   match s with
@@ -370,47 +403,17 @@ decreasing_by
     apply Nat.lt_succ_self
   . simp
   . simp only [termination_metric, sizeOf_Form]
-    rw[maybee]
-    rw[maybee]
-    conv => lhs; rw[Nat.add_comm]
-    conv => rhs; rw[←Nat.add_assoc]
-    conv => rhs; rw[Nat.add_comm _ (sizeOf_Form a)]
-    have helper (a1 a2 b c : Nat) : a1 + a2 < b + (1 + a1 + c + a2) :=
-      by
-        rw [add_comm b _]
-        rw [add_assoc (1+ a1) c  a2 ]
-        rw [add_add_add_comm 1 a1 c a2]
-        rw [add_comm (1+c) _]
-        rw [Nat.add_assoc]
-        apply Nat.lt_add_of_pos_right
-        rw [Nat.add_assoc, Nat.add_comm 1 _]
-        apply Nat.zero_lt_succ
-    apply helper
+    have lt := Nat.lt_add_left (sizeOf_Form y) (maybe2 as ys x a)
+    conv => rhs; rw[Nat.add_comm (n:=1 + sizeOf_Form x)]
+    conv => rhs; rw[Nat.add_assoc]
+    apply lt
   . simp
   . simp only [termination_metric]
     simp only [sizeOf_Form]
-    rw[maybee]
-    rw[maybee]
-    conv => lhs; rw[Nat.add_comm]
-    conv => rhs; rw[←Nat.add_assoc]
-    have helper (a b : Nat) : a < 1 + a + b := by
-      have step1 := Nat.lt_add_one a
-      rw[Nat.add_comm] at step1
-      apply Nat.lt_add_right b
-      apply step1
-    have gg := helper (a:= sizeOf_Form x + List.foldl (fun x1 x2 => x1 + x2) 0 (List.map sizeOf_Form ys))
-                      (b:=sizeOf_Form a)
-    have helper1 (a b c : Nat) : 1 + a + b + c = 1 + (a + b) + c :=
-      by rw [add_comm (1 + a + b) c]
-         rw [add_assoc _ a b]
-         rw [add_comm c _]
-    rw[helper1]
-    apply gg
+    apply maybe2 as ys x a
   . simp only [termination_metric]
     simp only [sizeOf_Form]
-    rw[maybee]
-    rw[maybee]
-    simp
+    apply maybe3
 
 
 def automatedProofHelper (s : Sequent) : List (Proof s) :=
@@ -418,5 +421,23 @@ def automatedProofHelper (s : Sequent) : List (Proof s) :=
   | .seq xs a =>
     automatedProof (Seq4Proof.seq4 [] xs a)
 
+--notation "a" => Form.atoms Atom.atom₁
 
-#eval automatedProofHelper (.seq [.imp (.atoms .atom₁) (.atoms .atom₂)] (.atoms .atom₁))
+--modusponens
+#eval listProofToString (automatedProofHelper (.seq [.imp (.atoms .atom₁) (.atoms .atom₂), .atoms .atom₁] (.atoms .atom₂)))
+
+--define parse for string to Seq and then use it in main
+def parseForMain (s : String) : Sequent :=
+  have xs := s.splitOn
+  
+  sorry
+
+-- give input in format a a → b ⊢ b
+def main (args : List String) : IO Unit := do
+  match args with
+  | [] => throw (IO.userError "ERROR: No input file.")
+  | filename :: _ =>
+    let contents ← IO.FS.readFile filename
+    (← IO.getStdout).putStrLn s!"File content: {contents}"
+    let result := parseForMain contents
+    (← IO.getStdout).putStrLn s!"{result}"
