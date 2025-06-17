@@ -1,19 +1,10 @@
 import Mathlib.Tactic.Linarith.Frontend
 import Mathlib.Tactic.SimpRw
 
---make this decidable, solvable
-
 inductive Atom
   | atom₁ : Atom | atom₂ : Atom | atom₃ : Atom
 deriving DecidableEq, Repr
 open Atom
-
-instance : ToString Atom where
-  toString a :=
-    match a with
-    | atom₁ => "a"
-    | atom₂ => "b"
-    | atom₃ => "c"
 
 inductive Form
   | bot : Form
@@ -24,18 +15,6 @@ inductive Form
   | imp : Form → Form → Form
 deriving Repr
 open Form
-
-def formToString (form : Form) : String :=
-   match form with
-    | .bot => "⊥"
-    | .atoms a => toString a
-    | .neg a => "¬" ++ formToString a
-    | .and a b => formToString a ++ " ∧ " ++ formToString b
-    | .or a b => formToString a ++ " ∨ " ++ formToString b
-    | .imp a b => formToString a ++ " → " ++ formToString b
-
-instance : ToString Form where
-  toString form := formToString form
 
 /-
 Atomic values get valued as one , not as 0, to help show termination for the atomic case in antecedent.
@@ -55,11 +34,6 @@ inductive Sequent
   | seq : List Form → Form → Sequent
 deriving Repr
 
-instance : ToString Sequent where
-  toString seq :=
-  match seq with
-  | .seq xs a => (List.map formToString xs).toString ++ "⊢" ++ formToString a
-
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
@@ -70,32 +44,16 @@ inductive Seq4Proof
   | seq4 : (context1 : List Atom) → (context2 : List Form) → Form → Seq4Proof
 deriving Repr
 
-instance : ToString Seq4Proof where
-  toString seq4 :=
-  match seq4 with
-  | .seq4 as xs a => (List.map toString as).toString ++ (List.map formToString xs).toString ++ "⊢" ++ formToString a
-/-
-For determening termination we ignore the atomic list and only consider the sum value of all formulas and succedent to be decreasing
- -/
-@[simp]
-def termination_metric (s : Seq4Proof) : Nat :=
-  match s with
-  | .seq4 _ [] f => sizeOf_Form f
-  | .seq4 a (x::xs) f =>
-    sizeOf_Form x + termination_metric (.seq4 a xs f)
-termination_by s
-decreasing_by
-  . simp
 
 --def negation (x : Form) : Form := .imp x .bot
 /-
-TODO: rething representing negation as implication, feel like im skipping a few stepps like this and the definition isn't "pure"
+TODO: rethink representing negation as implication, feel like im skipping a few stepps like this and the definition isn't "pure"
 
 imp₁ imp₂ imp₃ imp₄ were initially defined to help with termination and looping prevention (paper by Roy Dyckhoff),
 but introduces other complexities...
 
 Right now copies of formulas in the proof tree are left out (in impl and negl) to make sure automatedProof terminates.
-reason for keeping copies- we may need to use them again to find our proof
+reason for keeping copies- we may need to use them again to find our proof- completeness
  -/
 inductive Proof : Sequent → Type
   -- ∀ x Γ, x ++ Γ ⊢ x
@@ -177,44 +135,6 @@ inductive Proof : Sequent → Type
 deriving Repr
 open Proof
 
-def listToString (xs : List Form) : String :=
-  String.intercalate ", " (xs.map formToString)
-
-
-def proofToString {seq : Sequent} : Proof seq → String
-| .ax a xs ys =>
-  s!"AX: {formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString a}"
-| .botl a xs ys =>
-  s!"⊥L: ⊥, {listToString xs}, {listToString ys} ⊢ {formToString a}"
-| .negr a xs proof =>
-  s!"{proofToString proof} '\n' ¬R: {listToString xs} ⊢ ¬{formToString a}"
-| .negl a b xs ys proof =>
-  s!"{proofToString proof} '\n' ¬L: ¬{formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString b}"
-| .andl a b c xs ys proof =>
-  s!"{proofToString proof} '\n' ∧L: ({formToString a} ∧ {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
-| .andr a b xs proof₁ proof₂=>
-  s!"{proofToString proof₁}    {proofToString proof₂} '\n' ∧R: {listToString xs} ⊢ {formToString a} ∧ {formToString b}"
-| .orl a b c xs ys proof₁ proof₂=>
-  s!"{proofToString proof₁}    {proofToString proof₂} '\n' ∨L: ({formToString a} ∨ {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
-| .orr1 a b xs proof =>
-  s!"{proofToString proof} '\n' ∨R₁: {listToString xs} ⊢ {formToString a} ∨ {formToString b}"
-| .orr2 a b xs proof =>
-  s!"{proofToString proof} '\n' ∨R₂: {listToString xs} ⊢ {formToString a} ∨ {formToString b}"
-| .impl a b c xs ys proof₁ proof₂ =>
-  s!"{proofToString proof₁}    {proofToString proof₂} '\n' →L: ({formToString a} → {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
-| .impr a b xs proof  =>
-  s!"{proofToString proof} '\n' →R: {listToString xs} ⊢ {formToString a} → {formToString b}"
-
-/-
-all ToString instances are for pretty-printing purposes
- -/
-def listProofToString : List (Proof seq) → String
-| [] => ""
-| x::xs => proofToString x ++ listProofToString xs
-
-instance : ToString (List (Proof seq)) where
-  toString proof := listProofToString proof
-
 
 /-
 Needed for finding proofs for atomic formulas ([a, b, c ,a, d], Γ ⊢ a) <- this can be split up many ways (2 different a forms) so essentially different proofs
@@ -289,7 +209,21 @@ def seqAtoms2seq (s : Seq4Proof) : Sequent :=
   | .seq4 xs ys a =>
     Sequent.seq ((xs.map .atoms) ++ ys) a
 
-theorem maybe2 as ys x a:
+/-
+For determening termination we ignore the atomic list and only consider the sum value of all formulas and succedent to be decreasing
+ -/
+@[simp]
+def termination_metric (s : Seq4Proof) : Nat :=
+  match s with
+  | .seq4 _ [] f => sizeOf_Form f
+  | .seq4 a (x::xs) f =>
+    sizeOf_Form x + termination_metric (.seq4 a xs f)
+termination_by s
+decreasing_by
+  . simp
+
+  
+theorem term_metric_compare as ys x a:
   termination_metric (Seq4Proof.seq4 as ys x) < 1 + sizeOf_Form x + termination_metric (Seq4Proof.seq4 as ys a) := by
   match ys with
   | [] =>
@@ -299,7 +233,7 @@ theorem maybe2 as ys x a:
     | 0 => exact step1
     | n + 1 => exact Nat.lt_add_right (n + 1) step1
   | b::bs =>
-    have ih := maybe2 bs (as:=as) (x:=x) (a:=a)
+    have ih := term_metric_compare bs (as:=as) (x:=x) (a:=a)
     simp
     simp at ih
     have obv {a b : Nat} (c : Nat) : a < b → c + a < c + b := fun a_1 => Nat.add_lt_add_left a_1 c
@@ -310,12 +244,12 @@ theorem maybe2 as ys x a:
     rw[←helper (b:=sizeOf_Form b)]
     apply step
 
-theorem maybe3 as ys a:
+theorem term_metric_compare2 as ys a:
   termination_metric (Seq4Proof.seq4 (as ++ [x]) ys a) < 1 + termination_metric (Seq4Proof.seq4 as ys a) := by
   match ys with
   | [] => simp
   | b::bs =>
-    have ih := maybe3 as bs a (x:=x)
+    have ih := term_metric_compare2 as bs a (x:=x)
     simp
     conv => rhs; rw[←Nat.add_assoc, Nat.add_comm 1, Nat.add_assoc]
     apply add_lt_add_left ih (sizeOf_Form b)
@@ -380,8 +314,7 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
 
 termination_by termination_metric s
 decreasing_by
-  . simp only [termination_metric, sizeOf_Form, Nat.add_zero, Nat.lt_add_left_iff_pos,
-    Nat.lt_add_one]
+  . simp only [termination_metric, sizeOf_Form, Nat.add_zero, Nat.lt_add_left_iff_pos, Nat.lt_add_one]
   . simp only [termination_metric, sizeOf_Form, gt_iff_lt]
     rw [Nat.add_comm 1 (sizeOf_Form a)]
     refine Nat.lt_add_right (sizeOf_Form b) ?_
@@ -403,17 +336,17 @@ decreasing_by
     apply Nat.lt_succ_self
   . simp
   . simp only [termination_metric, sizeOf_Form]
-    have lt := Nat.lt_add_left (sizeOf_Form y) (maybe2 as ys x a)
+    have lt := Nat.lt_add_left (sizeOf_Form y) (term_metric_compare as ys x a)
     conv => rhs; rw[Nat.add_comm (n:=1 + sizeOf_Form x)]
     conv => rhs; rw[Nat.add_assoc]
     apply lt
   . simp
   . simp only [termination_metric]
     simp only [sizeOf_Form]
-    apply maybe2 as ys x a
+    apply term_metric_compare as ys x a
   . simp only [termination_metric]
     simp only [sizeOf_Form]
-    apply maybe3
+    apply term_metric_compare2
 
 
 def automatedProofHelper (s : Sequent) : List (Proof s) :=
@@ -421,23 +354,103 @@ def automatedProofHelper (s : Sequent) : List (Proof s) :=
   | .seq xs a =>
     automatedProof (Seq4Proof.seq4 [] xs a)
 
---notation "a" => Form.atoms Atom.atom₁
+---------------------------------PARSING-----------------------------
+instance : ToString Atom where
+  toString a :=
+    match a with
+    | atom₁ => "a"
+    | atom₂ => "b"
+    | atom₃ => "c"
 
---modusponens
+def formToString (form : Form) : String :=
+   match form with
+    | .bot => "⊥"
+    | .atoms a => toString a
+    | .neg a => "¬" ++ formToString a
+    | .and a b => formToString a ++ " ∧ " ++ formToString b
+    | .or a b => formToString a ++ " ∨ " ++ formToString b
+    | .imp a b => formToString a ++ " → " ++ formToString b
+
+instance : ToString Form where
+  toString form := formToString form
+
+instance : ToString Sequent where
+  toString seq :=
+  match seq with
+  | .seq xs a => (List.map formToString xs).toString ++ "⊢" ++ formToString a
+
+instance : ToString Seq4Proof where
+  toString seq4 :=
+  match seq4 with
+  | .seq4 as xs a => (List.map toString as).toString ++ (List.map formToString xs).toString ++ "⊢" ++ formToString a
+
+def listToString (xs : List Form) : String :=
+  String.intercalate ", " (xs.map formToString)
+
+def proofToString {seq : Sequent} : Proof seq → String
+| .ax a xs ys =>
+  s!"AX: {formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString a}"
+| .botl a xs ys =>
+  s!"⊥L: ⊥, {listToString xs}, {listToString ys} ⊢ {formToString a}"
+| .negr a xs proof =>
+  s!"{proofToString proof} '\n' ¬R: {listToString xs} ⊢ ¬{formToString a}"
+| .negl a b xs ys proof =>
+  s!"{proofToString proof} '\n' ¬L: ¬{formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString b}"
+| .andl a b c xs ys proof =>
+  s!"{proofToString proof} '\n' ∧L: ({formToString a} ∧ {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
+| .andr a b xs proof₁ proof₂=>
+  s!"{proofToString proof₁}    {proofToString proof₂} '\n' ∧R: {listToString xs} ⊢ {formToString a} ∧ {formToString b}"
+| .orl a b c xs ys proof₁ proof₂=>
+  s!"{proofToString proof₁}    {proofToString proof₂} '\n' ∨L: ({formToString a} ∨ {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
+| .orr1 a b xs proof =>
+  s!"{proofToString proof} '\n' ∨R₁: {listToString xs} ⊢ {formToString a} ∨ {formToString b}"
+| .orr2 a b xs proof =>
+  s!"{proofToString proof} '\n' ∨R₂: {listToString xs} ⊢ {formToString a} ∨ {formToString b}"
+| .impl a b c xs ys proof₁ proof₂ =>
+  s!"{proofToString proof₁}    {proofToString proof₂} '\n' →L: ({formToString a} → {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
+| .impr a b xs proof  =>
+  s!"{proofToString proof} '\n' →R: {listToString xs} ⊢ {formToString a} → {formToString b}"
+
+/-
+all ToString instances are for pretty-printing purposes
+ -/
+def listProofToString : List (Proof seq) → String
+| [] => ""
+| x::xs => proofToString x ++ listProofToString xs
+
+instance : ToString (List (Proof seq)) where
+  toString proof := listProofToString proof
+
+--modusponens "a → b, a ⊢ β"
 #eval listProofToString (automatedProofHelper (.seq [.imp (.atoms .atom₁) (.atoms .atom₂), .atoms .atom₁] (.atoms .atom₂)))
 
---define parse for string to Seq and then use it in main
-def parseForMain (s : String) : Sequent :=
-  have xs := s.splitOn
-  
-  sorry
+/- def parseExpr (tokens : List String) : Form :=
+  match tokens with
+  | ["a"] => .atoms .atom₁
+  | ["b"] => .atoms .atom₂
+  | ["c"] => .atoms .atom₃
+  | x :: "→" :: y :: xs' => Form.imp (parseExpr x) (parseExpr y)
+  | x :: "∧" :: y :: xs' => .and (parseExpr x) (parseExpr y)
+  | x :: "∨" :: y :: xs' => .or (parseExpr x) (parseExpr y)
+  | "¬" => sorry
 
--- give input in format a a → b ⊢ b
+--define parse for string to Seq and then use it in main ""
+def parseSequent (s : String) : Sequent :=
+  have sequent := s.splitOn "⊢"
+  match sequent with
+  | [antecedent, succedent] =>
+    let commaseperated  :=  List.map (λ s => s.splitOn " ") (antecedent.trim.splitOn ",")
+    let huh := List.map parseExpr commaseperated
+    let forms := parseExpr ()
+  |_ => sorry
+
+
+-- give input in format a, a → b ⊢ b
 def main (args : List String) : IO Unit := do
   match args with
   | [] => throw (IO.userError "ERROR: No input file.")
   | filename :: _ =>
     let contents ← IO.FS.readFile filename
     (← IO.getStdout).putStrLn s!"File content: {contents}"
-    let result := parseForMain contents
-    (← IO.getStdout).putStrLn s!"{result}"
+    let result := parseSequent contents
+    (← IO.getStdout).putStrLn s!"{result}" -/
