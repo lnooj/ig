@@ -1,5 +1,6 @@
 import Mathlib.Tactic.Linarith.Frontend
 import Mathlib.Tactic.SimpRw
+import Mathlib.Data.Prod.Lex
 
 inductive Atom
   | atom₁ : Atom | atom₂ : Atom | atom₃ : Atom
@@ -37,23 +38,17 @@ deriving Repr
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
-Other option: vector with context length and booleans representing if we've "visited/looked at them"
+
+In addition we will seperate "special" forms (impl and negl), which require special treatment using a "fuel" counter
  -/
--- [x, y], [f1, f2] ⊢ f
+-- [x, y], [f1, f2], [imp1, imp2] ⊢ f
 inductive Seq4Proof
-  | seq4 : (context1 : List Atom) → (context2 : List Form) → Form → Seq4Proof
+  | seq4 : List Atom → List Form → List Form → (fuel : Nat) → Form → Seq4Proof
 deriving Repr
 
 
---def negation (x : Form) : Form := .imp x .bot
 /-
-TODO: rethink representing negation as implication, feel like im skipping a few stepps like this and the definition isn't "pure"
 
-imp₁ imp₂ imp₃ imp₄ were initially defined to help with termination and looping prevention (paper by Roy Dyckhoff),
-but introduces other complexities...
-
-Right now copies of formulas in the proof tree are left out (in impl and negl) to make sure automatedProof terminates.
-reason for keeping copies- we may need to use them again to find our proof- completeness
  -/
 inductive Proof : Sequent → Type
   -- ∀ x Γ, x ++ Γ ⊢ x
@@ -66,13 +61,13 @@ inductive Proof : Sequent → Type
       Proof (.seq (xs ++ .bot :: ys) x)
   -- ∀ a Γ, (Γ, a ⊢ ⊥) → (Γ ⊢ ¬a)
   | negr :
-    ∀ (x : Form) (xs : List Form),
-            Proof (.seq (xs ++ [x]) .bot) →
-            Proof (.seq (xs) (.neg x))
+    ∀ (x : Form) (xs ys : List Form),
+            Proof (.seq (xs ++ x :: ys) .bot) →
+            Proof (.seq (xs ++ ys) (.neg x))
   -- ∀ a b Γ, (Γ, ¬a ⊢ a) → (Γ, ¬a ⊢ b)
   | negl :
     ∀ (x y : Form) (xs ys : List Form),
-            Proof (.seq (xs ++/-  (.neg x) :: -/ ys) x) → -- copy of .neg x in context
+            Proof (.seq (xs ++ ys ++ [.neg x]) x) → -- copy of .neg x in context, also as last elem bc equality error in proof func
             Proof (.seq (xs ++ (.neg x) :: ys) y)
   -- ∀ a b c Γ, (Γ, a, b ⊢ c) → (Γ, a ∧ b ⊢ c)
   | andl :
@@ -102,39 +97,20 @@ inductive Proof : Sequent → Type
       Proof (.seq xs b) →
       Proof (.seq xs (.or a b))
   -- ∀ a b c Γ, (a → b, Γ ⊢ a) → (b, Γ ⊢ c) → (a → b, Γ ⊢ c)
+  | impr :
+    ∀ (a b : Form) (xs ys : List Form),
+      Proof (.seq (xs ++ a :: ys) b) →
+      Proof (.seq (xs ++ ys) (.imp a b))
   | impl :
     ∀ (a b c : Form) (xs ys : List Form),
-      Proof (.seq (xs ++ /- (.imp a b) :: -/ ys ) a) → -- copy of (.imp a b) in list
+      Proof (.seq (xs ++  ys ++ [(.imp a b)]) a) → -- copy of (.imp a b) in list as last elem bc of equality problem in proof func
       Proof (.seq (xs ++ b :: ys ) c) →
       Proof (.seq (xs ++ (.imp a b) :: ys) c)
-/-   -- a is atomic
-  | impl₁ :
-    ∀ (a : Atom) (b c : Form) (xs ys : List Form),
-      Proof (.seq (xs ++ [.atoms a] ++ [b] ++ ys) c) → -- a ja b ei peaks olema järjest
-      Proof (.seq (xs ++ [.imp (.atoms a) b] ++ [.atoms a] ++ ys) c)
-  -- implications left side is and op
-  | impl₂ :
-    ∀ (a b c d : Form) (xs ys : List Form),
-      Proof (.seq (xs ++ [.imp a (.imp b c)] ++ ys) d) →
-      Proof (.seq (xs ++ [.imp (.and a b) c] ++ ys) d)
-  -- left side is or op
-  | impl₃ :
-    ∀ (a b c d : Form) (xs ys : List Form),
-      Proof (.seq (xs ++ [.imp a c] ++ [.imp b c] ++ ys) d) → -- sama mure ↑
-      Proof (.seq (xs ++ [.imp (.or a b) c] ++ ys) d)
-  | impl₄ :
-    ∀ (a b c d : Form) (xs ys : List Form),
-      Proof (.seq (xs ++ [.imp a b] ++ ys) (.imp c a)) →
-      Proof (.seq (xs ++ [b] ++ ys) d) →
-      Proof (.seq (xs ++ [.imp (.imp c a) b] ++ ys) d) -/
-  -- ∀ a b Γ, (a, Γ ⊢ b) → (Γ ⊢ a → b)
-  | impr :
-    ∀ (a b : Form) (xs  : List Form),
-      Proof (.seq (xs ++ [a] ) b) →
-      Proof (.seq (xs) (.imp a b))
+
 deriving Repr
 open Proof
 
+#eval Proof.ax (.atoms .atom₁) [.atoms .atom₂] []
 
 /-
 Needed for finding proofs for atomic formulas ([a, b, c ,a, d], Γ ⊢ a) <- this can be split up many ways (2 different a forms) so essentially different proofs
@@ -206,153 +182,200 @@ def getPairs (xs : List α ) (ys : List β ) : List (α × β) :=
 @[simp]
 def seqAtoms2seq (s : Seq4Proof) : Sequent :=
   match s with
-  | .seq4 xs ys a =>
-    Sequent.seq ((xs.map .atoms) ++ ys) a
+  | .seq4 atom forms imps fuel a =>
+    Sequent.seq ((atom.map .atoms) ++ forms ++ imps) a
 
 /-
 For determening termination we ignore the atomic list and only consider the sum value of all formulas and succedent to be decreasing
+OR if it doesnt decrease- the fuel count(n) needs to decrease- so metric is a pair (sum, fuel)
  -/
+def size_sum : List Form → Nat
+  | [] => 0
+  | f :: fs => sizeOf_Form f + size_sum fs
+
+
 @[simp]
-def termination_metric (s : Seq4Proof) : Nat :=
-  match s with
-  | .seq4 _ [] f => sizeOf_Form f
-  | .seq4 a (x::xs) f =>
-    sizeOf_Form x + termination_metric (.seq4 a xs f)
-termination_by s
-/- decreasing_by
-  . simp -/
+def termination_metric (s : Seq4Proof) : Nat × Nat :=
+match s with
+  | .seq4 _ forms imps n a => (n, size_sum forms + size_sum imps + sizeOf_Form a)
 
-
-theorem term_metric_compare as ys x a:
-  termination_metric (Seq4Proof.seq4 as ys x) < 1 + sizeOf_Form x + termination_metric (Seq4Proof.seq4 as ys a) := by
-  match ys with
-  | [] =>
-    simp
-    have step1 : sizeOf_Form x < 1 + sizeOf_Form x := lt_one_add (sizeOf_Form x)
-    match sizeOf_Form a with
-    | 0 => exact step1
-    | n + 1 => exact Nat.lt_add_right (n + 1) step1
-  | b::bs =>
-    have ih := term_metric_compare bs (as:=as) (x:=x) (a:=a)
-    simp
-    simp at ih
-    have obv {a b : Nat} (c : Nat) : a < b → c + a < c + b := fun a_1 => Nat.add_lt_add_left a_1 c
-    have step := obv (sizeOf_Form b) ih
-    clear obv ih
-    have helper (b x tma : Nat) : b + ((1 + x) + tma) = (1 + x) + (b + tma) := by
-      conv => rhs; rw[←Nat.add_assoc (n:= 1 + x), Nat.add_comm (n:= 1 + x), Nat.add_assoc]
-    rw[←helper (b:=sizeOf_Form b)]
-    apply step
-
-theorem term_metric_compare2 as ys a:
-  termination_metric (Seq4Proof.seq4 (as ++ [x]) ys a) < 1 + termination_metric (Seq4Proof.seq4 as ys a) := by
-  match ys with
-  | [] => simp
-  | b::bs =>
-    have ih := term_metric_compare2 as bs a (x:=x)
-    simp
-    conv => rhs; rw[←Nat.add_assoc, Nat.add_comm 1, Nat.add_assoc]
-    apply add_lt_add_left ih (sizeOf_Form b)
 
 def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
   match s with
-------proving succedent using only atomics from left side---------
-  | .seq4 as [] (.atoms a) =>
+  ------proving succedent using only atomics from left side---------
+  | .seq4 as [] imps n (.atoms a) =>
       have zs_corr := splitByCorrectness as a
+      -- case: a is not in as
       match g : splitBy as a with
-      | [] => []
+      | [] =>
+------no atomic rule can be applied, start opening up copies of imp formulas---------------------
+        match imps with
+          | [] => []
+          | (.imp x y) :: ys =>
+            match n with
+            | 0 => [] -- sorry
+            | n' + 1 => by
+              have pairs := getPairs (automatedProof (.seq4 as [] (ys ++ [.imp x y]) n' x))
+                                     (automatedProof (.seq4 as [y] ys n' (.atoms a)))
+              have funky := impl x y (.atoms a) (as.map .atoms) ys
+              simp at funky; simp at pairs
+              have h₁ := List.map funky.uncurry pairs
+              simp only [seqAtoms2seq, List.append_nil]
+              exact h₁
+          | (.neg x) :: ys =>
+            match n with
+            | 0 => [] -- sorry
+            | n' + 1 => by
+              have proofs := automatedProof (.seq4 as [] (ys ++ [.neg x]) n' x)
+              have funky := negl x (.atoms a) (as.map .atoms) ys
+              simp; simp at funky; simp at proofs
+              exact List.map funky proofs
+          | _ :: ys => []
       | x::xs => by
         rw [g] at zs_corr
         have h1 := zs_corr x (by simp)
         rw [←h1]
-        have first_proof := ax (.atoms a) (List.map .atoms x.fst) (List.map .atoms x.snd)
+        have first_proof := ax (.atoms a) (List.map .atoms x.fst)  ((List.map .atoms x.snd) ++ imps)
         simp only [seqAtoms2seq, List.map_append, List.map_cons, List.append_nil]
-        have rest_of_proofs := List.map (λ y => ax (.atoms a) (List.map .atoms x.fst) (List.map .atoms x.snd)) xs
+        have rest_of_proofs := List.map (λ y => ax (.atoms a) (List.map .atoms x.fst) ((List.map .atoms x.snd) ++ imps)) xs
+        simp at first_proof; simp at rest_of_proofs; simp
         exact first_proof::rest_of_proofs
-  | .seq4 as [] .bot => []
-  | .seq4 as [] (.neg a) =>
-    have h₁ := automatedProof (.seq4 as [a] .bot) -- list of proofs
-    have h₂ := List.map (negr a (as.map .atoms)) h₁
-    by unfold seqAtoms2seq
-       simp only [List.append_nil]
-       exact h₂
-  | .seq4 as [] (.or a b) =>
-      (automatedProof (.seq4 as [] a)).map (orr1 a b ((as.map .atoms)++[]))  ++
-      (automatedProof (.seq4 as [] b)).map (orr2 a b ((as.map .atoms)++[]))
-  | .seq4 as [] (.imp a b) =>
-    have h₁ := (automatedProof (.seq4 as [a] b))
-    have h₂ := List.map (impr a b ((as.map .atoms))) h₁
-    by unfold seqAtoms2seq
-       simp only [List.append_nil]
-       exact h₂
-  | .seq4 as [] (.and a b) =>
-      (getPairs (automatedProof (.seq4 as [] a)) (automatedProof (.seq4 as [] b))).map
-      ((andr a b ((as.map .atoms)++[])).uncurry)
+  | .seq4 as [] _ n .bot => []
+  | .seq4 as [] imps n (.neg a) => by
+    have h₁ := automatedProof (.seq4 as [a] imps n .bot)
+    simp at h₁
+    have h₂ := List.map (negr a (as.map .atoms) imps) h₁
+    unfold seqAtoms2seq
+    simp only [List.append_nil]
+    exact h₂
+  | .seq4 as [] imps n (.and a b) =>
+      (getPairs (automatedProof (.seq4 as [] imps n a)) (automatedProof (.seq4 as [] imps n b))).map
+      ((andr a b ((as.map .atoms)++[]++imps)).uncurry)
+  | .seq4 as [] imps n (.or a b) =>
+      (automatedProof (.seq4 as [] imps n a)).map (orr1 a b ((as.map .atoms)++[]++imps))  ++
+      (automatedProof (.seq4 as [] imps n b)).map (orr2 a b ((as.map .atoms)++[]++imps))
+  | .seq4 as [] imps n (.imp a b) => by
+    have h₁ := (automatedProof (.seq4 as [a] imps n b))
+    simp at h₁
+    have h₂ := List.map (impr a b (as.map .atoms) imps) h₁
+    unfold seqAtoms2seq
+    simp only [List.append_nil]
+    exact h₂
 ------opening up the antecedent formulas one by one----------
-  | .seq4 as ((.and x y) :: ys) a =>
-    have h₁ := automatedProof (.seq4 as (x :: y :: ys) a)
-    List.map (andl x y a (as.map .atoms) ys) h₁
-  | .seq4 as ((.or x y) :: ys) a =>
-      (getPairs (automatedProof (.seq4 as (x::ys) a)) (automatedProof (.seq4 as (y::ys) a))).map
-      (orl x y a (as.map .atoms) ys).uncurry
-  | .seq4 as ((.imp x y) :: ys) a =>
-      (getPairs (automatedProof (.seq4 as (/- .imp x y :: -/ ys) x )) -- first draft wo copy
-                (automatedProof (.seq4 as (y::ys) a))).map
-      (impl x y a (as.map .atoms) ys).uncurry
-  | .seq4 as ((.neg x) :: ys) a =>
-    have h₁ := automatedProof (.seq4 as (/- (.neg x) :: -/ ys) x) -- first draft wo copy of neg x
-    have h₂ := negl x a (as.map .atoms) ys
-    List.map h₂ h₁
-  | .seq4 as ((.atoms x) :: ys) a =>
-    have h₁ := automatedProof (.seq4 (as ++ [x]) ys a)
+  | .seq4 as ((.and x y) :: ys) imps n a => by
+    have h₁ := automatedProof (.seq4 as (x :: y :: ys) imps n a)
+    simp at h₁
+    have h₂ := List.map (andl x y a (as.map .atoms) (ys++imps) ) h₁
+    simp only [seqAtoms2seq, List.append_assoc, List.cons_append]
+    exact h₂
+  | .seq4 as ((.or x y) :: ys) imps n a => by
+    have pairList := getPairs (automatedProof (.seq4 as (x::ys) imps n a)) (automatedProof (.seq4 as (y::ys) imps n a))
+    have funcy := (orl x y a (as.map .atoms) (ys++imps))
+    simp at pairList
+    have h₁ := List.map funcy.uncurry pairList
+    simp only [seqAtoms2seq, List.append_assoc, List.cons_append]
+    exact h₁
+  | .seq4 as ((.imp x y) :: ys) imps n a =>
+    match n with -- go into fuel termination, bc i still deal with imp case and duplicate it, so wont get smaller
+    | 0 => []
+    | n'+ 1 => by
+      have pairList := getPairs (automatedProof (.seq4 as ys ( imps ++ [.imp x y]) n' x )) (automatedProof (.seq4 as (y::ys) imps (n'+1) a)) -- do i call the second recursive call with n or n'
+      simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at pairList
+      have funcy :=  impl x y a (as.map .atoms) (ys++imps)
+      simp only [List.append_assoc] at funcy
+      have h₁ := List.map funcy.uncurry pairList
+      simp only [seqAtoms2seq, List.append_assoc, List.cons_append]
+      exact h₁
+  | .seq4 as ((.neg x) :: ys) imps n a =>
+    match n with
+    | 0 => []
+    | n' + 1 => by
+      have proofList := automatedProof (.seq4 as ys (imps ++ [.neg x]) n' x) -- this still doesnt terminate based on metric
+      have funky := negl x a (as.map .atoms) (ys++imps)
+      simp only [seqAtoms2seq, List.append_assoc] at proofList
+      simp only [List.append_assoc] at funky
+      simp only [seqAtoms2seq, List.append_assoc, List.cons_append]
+      exact List.map funky proofList
+  | .seq4 as ((.atoms x) :: ys) imps n a =>
+    have h₁ := automatedProof (.seq4 (as ++ [x]) ys imps n a)
     by unfold seqAtoms2seq
-       simp only
+       simp only [List.append_assoc, List.cons_append]
        unfold seqAtoms2seq at h₁
        simp at h₁
        exact h₁
-  | .seq4 as (.bot :: ys) a => [botl a (as.map .atoms) ys] -- we have bottom on the left, so we can conclude a
-
-termination_by termination_metric s
+  | .seq4 as (.bot :: ys) imps n a => by
+    have rule := [botl a (as.map .atoms) (ys++imps)] -- we have bottom on the left, so we can conclude a
+    simp only [seqAtoms2seq, List.append_assoc, List.cons_append]
+    exact rule
+termination_by (termination_metric s)
 decreasing_by
-  . simp only [termination_metric, sizeOf_Form, Nat.add_zero, Nat.lt_add_left_iff_pos, Nat.lt_add_one]
-  . simp only [termination_metric, sizeOf_Form, gt_iff_lt]
-    rw [Nat.add_comm 1 (sizeOf_Form a)]
-    refine Nat.lt_add_right (sizeOf_Form b) ?_
-    apply Nat.lt_succ_self
-  . simp
-  . simp
-  . simp
-    rw [Nat.add_comm 1 (sizeOf_Form a)]
-    refine Nat.lt_add_right (sizeOf_Form b) ?_
-    apply Nat.lt_succ_self
-  . simp
-  . simp only [termination_metric, sizeOf_Form]
-    conv => lhs; rw [←Nat.add_assoc]
-    have := Nat.le_succ (sizeOf_Form x + sizeOf_Form y + termination_metric (Seq4Proof.seq4 as ys a))
-    simp only [Nat.add_lt_add_iff_right, Nat.lt_add_left_iff_pos, Nat.lt_add_one]
-  . simp
-    rw [Nat.add_comm 1 (sizeOf_Form x)]
-    refine Nat.lt_add_right (sizeOf_Form y) ?_
-    apply Nat.lt_succ_self
-  . simp
-  . simp only [termination_metric, sizeOf_Form]
-    have lt := Nat.lt_add_left (sizeOf_Form y) (term_metric_compare as ys x a)
-    conv => rhs; rw[Nat.add_comm (n:=1 + sizeOf_Form x)]
-    conv => rhs; rw[Nat.add_assoc]
-    apply lt
-  . simp
-  . simp only [termination_metric]
-    simp only [sizeOf_Form]
-    apply term_metric_compare as ys x a
-  . simp only [termination_metric]
-    simp only [sizeOf_Form]
-    apply term_metric_compare2
+. simp only [termination_metric]
+  simp
+  apply Prod.Lex.left
+  simp
+. simp
+  apply Prod.Lex.left
+  simp
+. simp
+  apply Prod.Lex.left
+  simp
+. simp
+  apply Prod.Lex.right
+  unfold size_sum; unfold size_sum; simp
+  rw[ Nat.add_comm  _ (sizeOf_Form a)]
+  rw[ Nat.add_comm (sizeOf_Form a) _ ]
+  rw [← Nat.add_assoc]
+  apply Nat.lt_add_one
+. simp
+  apply Prod.Lex.right
+  simp
+  rw [Nat.add_comm 1 (sizeOf_Form a)]
+  refine Nat.lt_add_right (sizeOf_Form b) ?_
+  apply Nat.lt_succ_self
+. simp
+  apply Prod.Lex.right
+  simp
+. simp; apply Prod.Lex.right; simp
+  rw [Nat.add_comm 1 (sizeOf_Form a)]
+  refine Nat.lt_add_right (sizeOf_Form b) ?_
+  apply Nat.lt_succ_self
+. simp
+  apply Prod.Lex.right
+  simp
+. simp; apply Prod.Lex.right
+  unfold size_sum; simp
+  rw [Nat.add_assoc 1 _]; rw [Nat.add_comm 1 _];
+  rw [Nat.add_comm (sizeOf_Form a + size_sum []) _]; unfold size_sum; simp
+  rw [← Nat.add_assoc]; rw [← Nat.add_assoc]
+  apply Nat.lt_add_one
+. simp; apply Prod.Lex.right; simp
+  unfold size_sum; conv => rhs; unfold sizeOf_Form;
+  conv => lhs; unfold size_sum
+  rw [← Nat.add_assoc]
+  simp only [add_lt_add_iff_right, lt_add_iff_pos_left, Nat.lt_one_iff, pos_of_gt]
+. simp; apply Prod.Lex.right; simp
+  unfold size_sum; conv => rhs; unfold sizeOf_Form;
+  simp; rw[Nat.add_comm 1 _]; rw [Nat.add_assoc]
+  simp
+. simp; apply Prod.Lex.right; simp
+  unfold size_sum; conv => rhs; unfold sizeOf_Form;
+  simp;
+. simp; apply Prod.Lex.left; simp
+. simp; apply Prod.Lex.right; simp
+  unfold size_sum; conv => rhs; unfold sizeOf_Form;
+  simp
+. simp; apply Prod.Lex.left; simp
+. simp; apply Prod.Lex.right; simp
+  conv => rhs; unfold size_sum
+  simp
 
 
 def automatedProofHelper (s : Sequent) : List (Proof s) :=
   match s with
-  | .seq xs a =>
-    automatedProof (Seq4Proof.seq4 [] xs a)
+  | .seq xs a => by
+    have proofs := automatedProof (Seq4Proof.seq4 [] xs [] 5 a)
+    simp only [seqAtoms2seq, List.map_nil, List.nil_append, List.append_nil] at proofs
+    exact proofs
 
 ---------------------------------PARSING-----------------------------
 instance : ToString Atom where
@@ -382,7 +405,7 @@ instance : ToString Sequent where
 instance : ToString Seq4Proof where
   toString seq4 :=
   match seq4 with
-  | .seq4 as xs a => (List.map toString as).toString ++ (List.map formToString xs).toString ++ "⊢" ++ formToString a
+  | .seq4 as xs is n a => (List.map toString as).toString ++ (List.map formToString xs).toString ++ (List.map formToString is).toString ++ "⊢" ++ formToString a
 
 def listToString (xs : List Form) : String :=
   String.intercalate ", " (xs.map formToString)
@@ -392,8 +415,8 @@ def proofToString {seq : Sequent} : Proof seq → String
   s!"AX: {formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString a}"
 | .botl a xs ys =>
   s!"⊥L: ⊥, {listToString xs}, {listToString ys} ⊢ {formToString a}"
-| .negr a xs proof =>
-  s!"{proofToString proof} '\n' ¬R: {listToString xs} ⊢ ¬{formToString a}"
+| .negr a xs ys proof =>
+  s!"{proofToString proof} '\n' ¬R: {listToString xs}, {listToString ys} ⊢ ¬{formToString a}"
 | .negl a b xs ys proof =>
   s!"{proofToString proof} '\n' ¬L: ¬{formToString a}, {listToString xs}, {listToString ys} ⊢ {formToString b}"
 | .andl a b c xs ys proof =>
@@ -408,8 +431,8 @@ def proofToString {seq : Sequent} : Proof seq → String
   s!"{proofToString proof} '\n' ∨R₂: {listToString xs} ⊢ {formToString a} ∨ {formToString b}"
 | .impl a b c xs ys proof₁ proof₂ =>
   s!"{proofToString proof₁}    {proofToString proof₂} '\n' →L: ({formToString a} → {formToString b}), {listToString xs}, {listToString ys} ⊢ {formToString c}"
-| .impr a b xs proof  =>
-  s!"{proofToString proof} '\n' →R: {listToString xs} ⊢ {formToString a} → {formToString b}"
+| .impr a b xs ys proof  =>
+  s!"{proofToString proof} '\n' →R: {listToString xs}, {listToString ys} ⊢ {formToString a} → {formToString b}"
 
 /-
 all ToString instances are for pretty-printing purposes
@@ -423,34 +446,3 @@ instance : ToString (List (Proof seq)) where
 
 --modusponens "a → b, a ⊢ β"
 #eval listProofToString (automatedProofHelper (.seq [.imp (.atoms .atom₁) (.atoms .atom₂), .atoms .atom₁] (.atoms .atom₂)))
-
-/- def parseExpr (tokens : List String) : Form :=
-  match tokens with
-  | ["a"] => .atoms .atom₁
-  | ["b"] => .atoms .atom₂
-  | ["c"] => .atoms .atom₃
-  | x :: "→" :: y :: xs' => Form.imp (parseExpr x) (parseExpr y)
-  | x :: "∧" :: y :: xs' => .and (parseExpr x) (parseExpr y)
-  | x :: "∨" :: y :: xs' => .or (parseExpr x) (parseExpr y)
-  | "¬" => sorry
-
---define parse for string to Seq and then use it in main ""
-def parseSequent (s : String) : Sequent :=
-  have sequent := s.splitOn "⊢"
-  match sequent with
-  | [antecedent, succedent] =>
-    let commaseperated  :=  List.map (λ s => s.splitOn " ") (antecedent.trim.splitOn ",")
-    let huh := List.map parseExpr commaseperated
-    let forms := parseExpr ()
-  |_ => sorry
-
-
--- give input in format a, a → b ⊢ b
-def main (args : List String) : IO Unit := do
-  match args with
-  | [] => throw (IO.userError "ERROR: No input file.")
-  | filename :: _ =>
-    let contents ← IO.FS.readFile filename
-    (← IO.getStdout).putStrLn s!"File content: {contents}"
-    let result := parseSequent contents
-    (← IO.getStdout).putStrLn s!"{result}" -/
