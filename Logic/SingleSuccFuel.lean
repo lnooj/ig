@@ -200,37 +200,34 @@ def termination_metric (s : Seq4Proof) : Nat × Nat :=
 match s with
   | .seq4 _ forms _ n a => (n, size_sum forms + sizeOf_Form a)
 
+mutual
+---helper for handling implication list------
+def handleImps (succ : Form) (as : List Atom) (imps : List Form) (n : Nat) : List (Proof (seqAtoms2seq (.seq4 as [] imps n succ))) :=
+  match imps with
+  | [] => []
+  | (.imp x y) :: ys =>
+    match n with
+    | 0 => [] -- sorry
+    | n' + 1 => by
+      have pairs := getPairs (automatedProof (.seq4 as [] (ys ++ [.imp x y]) n' x))
+                              (automatedProof (.seq4 as [y] ys n' succ))
+      have funky := impl x y succ (as.map .atoms) ys
+      simp at funky; simp at pairs
+      have h₁ := List.map funky.uncurry pairs
+      simp only [seqAtoms2seq, List.append_nil]
+      exact h₁
+  | (.neg x) :: ys =>
+    match n with
+    | 0 => [] -- sorry
+    | n' + 1 => by
+      have proofs := automatedProof (.seq4 as [] (ys ++ [.neg x]) n' x)
+      have funky := negl x succ (as.map .atoms) ys
+      simp; simp at funky; simp at proofs
+      exact List.map funky proofs
+  | _ :: ys => []
+termination_by (n, sizeOf_Form succ)
 
 def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
-  ---helper for handling implication list------
-  let rec handleImps (succ : Form) (as : List Atom) (imps : List Form) (n : Nat) : List (Proof (seqAtoms2seq (.seq4 as [] imps n succ))) :=
-    match imps with
-    | [] => []
-    | (.imp x y) :: ys =>
-      match n with
-      | 0 => [] -- sorry
-      | n' + 1 => by
-        have pairs := getPairs (automatedProof (.seq4 as [] (ys ++ [.imp x y]) n' x))
-                                (automatedProof (.seq4 as [y] ys n' succ))
-        have funky := impl x y succ (as.map .atoms) ys
-        simp at funky; simp at pairs
-        have h₁ := List.map funky.uncurry pairs
-        simp only [seqAtoms2seq, List.append_nil]
-        exact h₁
-    | (.neg x) :: ys =>
-      match n with
-      | 0 => [] -- sorry
-      | n' + 1 => by
-        have proofs := automatedProof (.seq4 as [] (ys ++ [.neg x]) n' x)
-        have funky := negl x succ (as.map .atoms) ys
-        simp; simp at funky; simp at proofs
-        exact List.map funky proofs
-    | _ :: ys => []
-  termination_by (n, sizeOf_Form succ)
-    --termination_metric (.seq4 as [] imps n succ)
-    --(n, sizeOf_Form succ)
-
-
   match s with
   ------proving succedent using only atomics from left side---------
   | .seq4 as [] imps n (.atoms a) =>
@@ -238,7 +235,11 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
       -- case: a is not in as
       match g : splitBy as a with
       ------no atomic rule can be applied, start opening up copies of imp formulas------
-      | [] => handleImps (.atoms a) as imps n
+      | [] =>
+        match n with
+        | 0 => []
+        | n' + 1 => handleImps (.atoms a) as imps n' --not the best solution
+
       | x::xs => by
         rw [g] at zs_corr
         have h1 := zs_corr x (by simp)
@@ -248,7 +249,10 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
         have rest_of_proofs := List.map (λ y => ax (.atoms a) (List.map .atoms x.fst) ((List.map .atoms x.snd) ++ imps)) xs
         simp
         exact first_proof::rest_of_proofs
-  | .seq4 as [] imps n .bot =>  handleImps .bot as imps n
+  | .seq4 as [] imps n .bot =>
+    match n with
+    | 0 => []
+    | n'+ 1 => handleImps .bot as imps n' --not the best solution
   | .seq4 as [] imps n (.neg a) => by
     have h₁ := automatedProof (.seq4 as [a] imps n .bot)
     simp at h₁
@@ -313,10 +317,10 @@ termination_by (termination_metric s)
 decreasing_by
 . simp only [termination_metric]
   apply Prod.Lex.left
-  sorry
+  simp
 . simp
   apply Prod.Lex.left
-  sorry
+  simp
 . simp
   apply Prod.Lex.right
   unfold size_sum; unfold size_sum; simp
@@ -366,7 +370,7 @@ decreasing_by
 . simp; apply Prod.Lex.right; simp
   conv => rhs; unfold size_sum
   simp
-
+end
 
 def automatedProofHelper (s : Sequent) : List (Proof s) :=
   match s with
@@ -388,9 +392,9 @@ def formToString (form : Form) : String :=
     | .bot => "⊥"
     | .atoms a => toString a
     | .neg a => "¬" ++ formToString a
-    | .and a b => formToString a ++ " ∧ " ++ formToString b
-    | .or a b => formToString a ++ " ∨ " ++ formToString b
-    | .imp a b => formToString a ++ " → " ++ formToString b
+    | .and a b => "(" ++ formToString a ++ " ∧ " ++ formToString b ++ ")"
+    | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
+    | .imp a b => "(" ++ formToString a ++ " → " ++ formToString b ++ ")"
 
 instance : ToString Form where
   toString form := formToString form

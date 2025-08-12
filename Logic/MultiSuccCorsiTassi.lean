@@ -66,16 +66,6 @@ inductive Proof : Sequent → Type
   | botl :
     ∀ (xs ys gs : List Form),
       Proof (.seq ↑(xs ++ .bot :: ys) ↑gs)
-  -- ∀ a Γ Δ, (Γ, a ⊢ ⊥) → (Γ ⊢ ¬a, Δ)
-  | negr :
-    ∀ (x : Form) (xs ys gs zs: List Form),
-            Proof (.seq ↑(xs ++ x :: ys) 0) →
-            Proof (.seq ↑(xs ++ ys) ↑(gs ++ (.neg x) :: zs))
-  -- ∀ a Γ Δ, (Γ, ¬a ⊢ a, Δ) → (Γ, ¬a ⊢ Δ)
-  | negl :
-    ∀ (x : Form) (Γ₁ Γ₂ Δ₁ Δ₂: List Form),
-            Proof (.seq ↑(Γ₁ ++ .neg x :: Γ₂ ) ↑(Δ₁ ++ x :: Δ₂)) → -- copy of .neg x in context, also as last elem bc equality error in proof func
-            Proof (.seq ↑(Γ₁ ++ .neg x :: Γ₂) ↑(Δ₁ ++ Δ₂) )
   -- ∀ a b Γ Δ, (Γ, a, b ⊢ Δ) → (Γ, a ∧ b ⊢ Δ)
   | andl :
     ∀ (a b : Form) (xs ys gs: List Form),
@@ -200,21 +190,25 @@ def size_sum : List Form → Nat
   | f :: fs => sizeOf_Form f + size_sum fs
 
 @[simp]
-def termination_metric (s : Seq4Proof) : Nat :=
+def termination_metric (s : Seq4Proof) : Nat × Nat:=
 match s with
-  | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂  => ( size_sum forms₁  + size_sum forms₂)
+  | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂  => ( size_sum imps₁ , size_sum forms₁ + size_sum forms₂)
 
--- find common atoms in anticident atoms list and succedent atoms list-----
+#check Prod.lex
+/- find common atoms in anticident atoms list and succedent atoms list. current: wo duplicates
+  Maybe return positions, to be precise, List (Atom, (index from xs, index from ys)) -/
 def findIntersection : List Atom → List Atom → List Atom
 -- xs.filter (fun a => a ∈ ys) |>.eraseDups
   | _ ,[] => []
   | xs, y::ys =>
     if y ∈ xs then
-      y :: findIntersection xs ys -- right now keeping duplicates, is that necessary?
+      if y ∈ findIntersection xs ys then
+        findIntersection xs ys
+      else y :: findIntersection xs ys -- right now keeping duplicates, is that necessary?
     else findIntersection xs ys
 
 theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
-  ∀ atom ∈ (findIntersection xs ys), atom ∈ xs ∧ atom ∈ ys :=
+  ∀ atom ∈ (findIntersection xs ys), atom ∈ xs ∧ atom ∈ ys := sorry /-
   λ atom atom_in =>
   match ys with
   | [] => by simp [findIntersection] at atom_in
@@ -233,9 +227,9 @@ theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
     . simp [cond] at atom_in
       have ih := findIntersCorr xs ys'
       have ⟨h₁, h₂⟩ := ih atom atom_in
-      exact ⟨h₁, List.Mem.tail _ h₂⟩
+      exact ⟨h₁, List.Mem.tail _ h₂⟩ -/
 
-
+/- current: findIntersection returns just intersection, wo. duplicates.  -/
 def findAtomicProofs (intersect : List Atom) (as : List Atom)
                     (imps₁ : List Form) (usedImps₁ : List Form)
                     (bs : List Atom) (imps₂ : List Form)
@@ -243,8 +237,21 @@ def findAtomicProofs (intersect : List Atom) (as : List Atom)
   have fin_corr := findIntersCorr as bs
   match intersect with
   | [] => []
-  | x :: xs =>
-    have zs_corr := splitByCorrectness as x
+  | x :: xs => by
+    have proof := ax (.atoms x) (List.map .atoms (as.erase x)) (imps₁ ++ usedImps₁) (List.map atoms (bs.erase x)) []
+    simp;
+    have Γ₁ : Multiset.ofList (List.map atoms (as.erase x) ++ atoms x :: (imps₁ ++ usedImps₁)) =
+               Multiset.ofList (List.map atoms as ++ (imps₁ ++ usedImps₁)) := by
+               sorry
+    have Γ₂ : Multiset.ofList (List.map atoms (bs.erase x) ++ [atoms x]) =
+               Multiset.ofList (List.map atoms bs) := by
+               sorry
+    rw [Γ₁, Γ₂] at proof
+    have rest := findAtomicProofs xs as imps₁ usedImps₁ bs imps₂
+    simp at rest
+    exact (proof :: rest)
+
+/-     have zs_corr := splitByCorrectness as x
     match g : splitBy as x  with -- we know this isn't empty, for x is in intersection
     | [] => [] -- should never come here
     | pair::pairs => by
@@ -252,10 +259,7 @@ def findAtomicProofs (intersect : List Atom) (as : List Atom)
       have h1 := zs_corr pair (by simp)
       simp; rw [←h1]
       have x_proof := ax (.atoms x) (List.map .atoms pair.fst) (List.map atoms pair.snd ++ imps₁ ++ usedImps₁) (List.map atoms (bs.erase x)) []
-      let x_proofs /- :  List (Proof (
-                    Sequent.seq
-                      ↑(List.map atoms (_) ++ atoms x :: (List.map atoms (_) ++ imps₁ ++ usedImps₁))
-                      ↑(List.map atoms (bs.erase x) ++ [atoms x]))) -/ :=
+      let x_proofs :=
             List.map
               (λ y =>
                   ax (atoms x)
@@ -273,7 +277,7 @@ def findAtomicProofs (intersect : List Atom) (as : List Atom)
                have h : x ∈ bs := by sorry
 
                simp only [Multiset.coe_eq_coe]; rw [List.perm_cons_erase h]
-      exact (x_proof::(findAtomicProofs xs as imps₁ usedImps₁ bs imps₂))
+      exact (x_proof::(findAtomicProofs xs as imps₁ usedImps₁ bs imps₂)) -/
 
 
 
@@ -291,7 +295,7 @@ lemma neg_eq_imp_bot (a : Form) :  .neg a = Form.imp a Form.bot := by rfl
  how to add SIC pop n push functionality
  -/
 
-partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
+def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
   match s with
   | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ =>
     match forms₁ with
@@ -332,7 +336,7 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
         unfold seqAtoms2seq; simp
         unfold seqAtoms2seq at h; simp at h
         exact h
-      | .bot :: succForms => sorry -- we are left with left and right imp lists
+      | .bot :: succForms => [] -- we are left with left and right imp lists
       | (.and a b) :: succForms => by
         have pair1 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (a :: succForms) imps₂)
         have pair2 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (b :: succForms) imps₂)
@@ -348,21 +352,6 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
         have h₂ := List.map (orr a b ((as.map .atoms) ++ imps₁ ++ usedImps₁) (bs.map .atoms) succForms) h₁
         unfold seqAtoms2seq; simp only [List.append_nil]
         exact h₂
-      | (.neg a) :: succForms => by --METARULE 1
-        if (.neg a) ∉ imps₂ then
-          have h₁ := automatedProof (.seq4 as [a] imps₁ usedImps₁ [] [] ((.neg a)::imps₂)) -- forget stuff on right side
-          simp at h₁
-          have h₂ := List.map (negr a (as.map .atoms) (imps₁ ++ usedImps₁) (bs.map .atoms) succForms) h₁
-          unfold seqAtoms2seq; simp
-          exact h₂
-        else -- HERE can try a fortiori METARULE 2
-          have h₁ := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (.bot :: succForms) imps₂)
-          simp only [seqAtoms2seq, List.append_nil] at h₁
-          have h₂ := List.map (afort a (.bot) ((as.map .atoms) ++ imps₁ ++ usedImps₁) (bs.map .atoms) succForms) h₁
-          unfold seqAtoms2seq; simp only [List.append_nil]
-          rw [neg_eq_imp_bot a]
-          exact h₂
-
       | (.imp a b) :: succForms => by --METARULE 1
         if (.imp a b) ∉ imps₂ then
           have h₁ := automatedProof (.seq4 as [a] (imps₁++usedImps₁) [] [] [b] ((.imp a b)::imps₂) ) --move all usedimps back
@@ -402,20 +391,6 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
       have h := List.map (orl a b (as.map .atoms) (antForms++imps₁++ usedImps₁) ((bs.map .atoms)++forms₂)).uncurry (getPairs pair₁ pair₂)
       simp only [← List.cons_append, ← List.append_assoc] at h
       exact h
-    | (.neg a) :: antForms => by -- METARULE 3
-      have h₁ := automatedProof (.seq4 as antForms imps₁ ((.neg a):: usedImps₁) bs (a::forms₂) imps₂)
-      simp only [seqAtoms2seq] at h₁
-      have h₁Γ : Multiset.ofList (List.map atoms as ++ antForms ++ imps₁ ++ a.neg :: usedImps₁) =
-                Multiset.ofList (List.map atoms as ++ antForms ++ a.neg :: (imps₁ ++ usedImps₁)) := by
-                simp; rw [ List.perm_append_left_iff, List.append_cons, List.perm_append_left_iff]
-                simp only [List.append_assoc, List.cons_append, List.nil_append, List.perm_middle]
-      rw [h₁Γ] at h₁
-      have h₂ := List.map (negl a ((as.map .atoms)++antForms) (imps₁++usedImps₁) (bs.map .atoms) (forms₂)) h₁
-      have h₂Γ : Multiset.ofList (List.map atoms as ++ antForms ++ a.neg :: (imps₁ ++ usedImps₁)) =
-                Multiset.ofList (List.map atoms as ++ a.neg :: (antForms ++ (imps₁ ++ usedImps₁))) := by
-                simp only [List.append_assoc, Multiset.coe_eq_coe]; rw [List.perm_append_left_iff]; simp
-      simp; rw [h₂Γ] at h₂
-      exact h₂
     | (.imp a b) :: antForms => by -- METARULE 3
       have pair₁ := automatedProof (.seq4 as antForms imps₁ ((.imp a b):: usedImps₁) bs (a::forms₂) imps₂ )
       have pair₂ := automatedProof (.seq4 as (b :: antForms) imps₁ (/- (.imp a b) :: -/ usedImps₁) bs forms₂ imps₂) -- by rule i cant keep copy of .imp a b in usedImps₁, do i need to?
@@ -429,6 +404,80 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
       exact h
 termination_by (termination_metric s)
 decreasing_by
-. simp
-  conv => rhs; unfold size_sum; simp
-  simp
+. simp; simp only [size_sum]; apply Prod.Lex.left; simp
+. simp; apply Prod.Lex.left; simp only [size_sum]; simp
+. simp; apply Prod.Lex.right; simp only [size_sum]; simp
+--. sorry bottom
+. simp; apply Prod.Lex.right; simp only [size_sum]; simp; rw [add_comm 1 _];
+  refine Nat.lt_add_right (sizeOf_Form b) ?_
+  apply Nat.lt_succ_self
+. simp; apply Prod.Lex.right; simp only [size_sum]; simp
+. simp; apply Prod.Lex.right; simp only [size_sum]; simp
+  rw [add_assoc, add_assoc, add_comm 1 _]
+  apply Nat.lt_succ_self
+. simp; simp only [size_sum]; simp--difficult case
+/-   have h : size_sum (imps₁ ++ usedImps₁) = size_sum imps₁ + size_sum usedImps₁ :=
+    by induction imps₁ with
+    | nil => simp [size_sum]
+    | cons x xs ih => simp [size_sum, ih]; rw [← Nat.add_assoc] -/
+  sorry
+  /- apply Prod.Lex.right; rw [add_assoc 1 _ _, add_comm 1 _]
+  refine Nat.lt_add_right (size_sum succForms) ?_
+  apply Nat.lt_succ_self
+   -/
+. apply Prod.Lex.right; simp only [size_sum]; simp
+. apply Prod.Lex.right; simp only [size_sum]; simp
+. apply Prod.Lex.right; simp only [size_sum]; simp;
+  rw [add_assoc, add_assoc ,add_comm 1 _]; apply Nat.lt_succ_self
+. apply Prod.Lex.right; simp only [size_sum]; simp; rw [add_comm 1 _]
+  refine Nat.lt_add_right (sizeOf_Form b) ?_
+  apply Nat.lt_succ_self
+. apply Prod.Lex.right; simp only [size_sum]; simp
+. apply Prod.Lex.right; simp only [size_sum]; simp
+  rw [add_assoc, add_comm _ (size_sum succForms + size_sum forms₂), add_comm _ (sizeOf_Form a), add_comm (sizeOf_Form a) _]
+  simp only [← add_assoc]
+  refine Nat.lt_add_right (sizeOf_Form b) ?_
+  apply Nat.lt_succ_self
+. apply Prod.Lex.right; simp only [size_sum]; simp
+
+---------------------------------PARSING-----------------------------
+instance : ToString Atom where
+  toString a :=
+    match a with
+    | atom₁ => "a"
+    | atom₂ => "b"
+    | atom₃ => "c"
+
+def formToString (form : Form) : String :=
+   match form with
+    | .bot => "⊥"
+    | .atoms a => toString a
+    | .neg a => "¬" ++ formToString a
+    | .and a b => "(" ++ formToString a ++ " ∧ " ++ formToString b ++ ")"
+    | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
+    | .imp a b => "(" ++ formToString a ++ " → " ++ formToString b ++ ")"
+
+instance : ToString Form where
+  toString form := formToString form
+
+/- def multisetToList (ms : Multiset Form) : List Form :=
+  Multiset.induction_on (m := fun _ => List Form) ms
+    []
+    (fun a s acc => a :: acc) -/
+
+/-
+def multisetToList (ms : Multiset Form) : List Form :=
+  Multiset.foldl (λ acc f => f :: acc) [] ms -/
+
+def multisetToString (ms : Multiset Form) : String :=
+  Quot.lift
+    (fun l : List Form => String.intercalate ", " (l.map formToString))
+    (by
+      intros a b h
+      unfold List.isSetoid at h
+      ) ms
+
+
+def seqToString (seq : Sequent) : String :=
+  match seq with
+  | .seq Δ Γ => (Δ.toList.map formToString).toString ++ "⊢" ++ (Γ.toList.map formToString).toString
