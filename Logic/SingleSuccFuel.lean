@@ -252,7 +252,7 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
   | .seq4 as [] imps n .bot =>
     match n with
     | 0 => []
-    | n'+ 1 => handleImps .bot as imps n' --not the best solution
+    | n'+ 1 => handleImps .bot as imps n' --not the best solution, fuel should not be decreased here
   | .seq4 as [] imps n (.neg a) => by
     have h₁ := automatedProof (.seq4 as [a] imps n .bot)
     simp at h₁
