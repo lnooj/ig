@@ -25,10 +25,10 @@ inductive Sequent
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
-[x, y], [f1, f2], usable[imp1, imp2], nonusable[imp1, imp2] ⊢ [x, y], [g1, g2], [imp1, imp2]
+[x, y], [f1, f2], usable[imp1, imp2], nonusable[imp1, imp2] ⊢ [x, y], [g1, g2], usable[imp1, imp2], used[imp1, imp2]
  -/
 inductive Seq4Proof
-  | seq4 : List Atom → List Form → List Form → List Form  → List Atom → List Form → List Form → Seq4Proof
+  | seq4 : List Atom → List Form → List Form → List Form  → List Atom → List Form → List Form → List Form → Seq4Proof
 --deriving Repr
 
 
