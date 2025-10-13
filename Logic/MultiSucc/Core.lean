@@ -2,11 +2,13 @@ import Mathlib.Data.Multiset.Basic
 
 namespace multiSucc
 
-
-inductive Atom
+/- inductive Atom
   | atom₁ : Atom | atom₂ : Atom | atom₃ : Atom
-deriving DecidableEq, Repr
+deriving DecidableEq, Repr -/
 
+structure Atom where
+  atom : Nat
+deriving DecidableEq, Repr
 
 inductive Form
 | bot : Form
@@ -15,6 +17,16 @@ inductive Form
 | or : Form → Form → Form
 | imp : Form → Form → Form
 deriving DecidableEq, Repr
+
+
+notation "⊥" => Form.bot
+infixl:50 " ∧∧ " => Form.and
+infixl:50 " ∨∨ " => Form.or
+infixl:60 " ⊃ " => Form.imp
+
+/- Defining negation as → ⊥  from the getgo-/
+def Form.neg (a : Form) : Form :=  a ⊃ ⊥
+
 
 /- Using Multisets to not worry about order of forms -/
 -- [f1, f2] ⊢ [g1, g2]

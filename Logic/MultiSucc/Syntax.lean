@@ -33,9 +33,9 @@ syntax "atom" "{" atom "}" : term
 macro_rules
 | `(atom {$id:ident}) =>
     match id.getId.toString with
-    | "p" => `(Atom.atom₁)
-    | "q" => `(Atom.atom₂)
-    | "r" => `(Atom.atom₃)
+    | "p" => `(Atom.mk 1)
+    | "q" => `(Atom.mk 2)
+    | "r" => `(Atom.mk 3)
     | s       => Lean.Macro.throwError s!"Unknown atom name: {s}"
 | `(mult { $[$fs:form],* }) => `(Multiset.ofList [ $[form {$fs}],* ])
 | `(seq { $Γ:multiset ⊢ $Δ:multiset }) =>

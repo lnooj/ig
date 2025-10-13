@@ -17,21 +17,20 @@ open multiSucc
   We need a way to order `Atom`s so we assign each constructor a unique number
   So our canonical order is `atom₁ ≤ atom₂ ≤ atom₃`
 -/
-def Atom.toNat : Atom → Nat
+/- def Atom.toNat : Atom → Nat
   | .atom₁ => 0
   | .atom₂ => 1
-  | .atom₃ => 2
+  | .atom₃ => 2 -/
 
   -- as an exercise you can prove this
-theorem atom_inj {a : Atom} (h : a.toNat = b.toNat) : a = b := by
+/- theorem atom_inj {a : Atom} (h : a.toNat = b.toNat) : a = b := by
   --unfold Atom.toNat at h
   cases a
   <;>  cases b -- <;> applies tactic on all subgoals
   <;> simp [Atom.toNat] at h
-  <;> rfl
+  <;> rfl -/
 
-/- Defining negation as → ⊥  from the getgo-/
-def Form.neg (a : multiSucc.Form) : Form := .imp a .bot
+
 
 /-
 Atomic values get valued as one , not as 0, to help show termination for the atomic case in antecedent.
@@ -39,7 +38,7 @@ Bottom is valued as 0, for it is semantically different from all others and does
  -/
 @[simp]
 def sizeOf_Form : Form → Nat
-  | .bot => 0
+  | ⊥ => 0
   | .atoms _ => 1
   | .and p q => 1 + sizeOf_Form p + sizeOf_Form q
   | .or p q => 1 + sizeOf_Form p + sizeOf_Form q
@@ -57,49 +56,49 @@ inductive Proof : Sequent → Type
   -- ∀ Δ Γ, (⊥, Γ ⊢ Δ)
   | botl :
     ∀ (xs ys gs : List Form),
-      Proof (.seq ↑(xs ++ .bot :: ys) ↑gs)
+      Proof (.seq ↑(xs ++ ⊥ :: ys) ↑gs)
   | botr :
     ∀ (xs ys gs : List Form),
       Proof (.seq ↑xs ↑(ys ++ gs)) →
-      Proof (.seq ↑xs ↑(ys ++ .bot :: gs))
+      Proof (.seq ↑xs ↑(ys ++ ⊥ :: gs))
   -- ∀ a b Γ Δ, (Γ, a, b ⊢ Δ) → (Γ, a ∧ b ⊢ Δ)
   | andl :
     ∀ (a b : Form) (xs ys gs: List Form),
       Proof (.seq ↑(xs ++ a :: b :: ys) ↑gs) →
-      Proof (.seq ↑(xs ++ (.and a b) :: ys) ↑gs)
+      Proof (.seq ↑(xs ++ (a ∧∧ b) :: ys) ↑gs)
   -- ∀ a b Γ Δ, (Γ ⊢ a, Δ) → (Γ ⊢ b, Δ) → (Γ ⊢ a ∧ b, Δ)
   | andr :
     ∀ (a b : Form) (xs ys gs: List Form),
       Proof (.seq ↑xs ↑(ys ++ a::gs)) →
       Proof (.seq ↑xs ↑(ys ++ b::gs)) →
-      Proof (.seq ↑xs ↑(ys ++ (.and a b)::gs))
+      Proof (.seq ↑xs ↑(ys ++ (a ∧∧ b)::gs))
   -- ∀ a b Γ Δ, (a, Γ ⊢ Δ) → (b, Γ ⊢ Δ) → (a ∨ b, Γ ⊢ Δ)
   | orl :
     ∀ (a b : Form) (xs ys gs : List Form),
     Proof (.seq ↑(xs ++ a :: ys) ↑gs) →
     Proof (.seq ↑(xs ++ b :: ys) ↑gs) →
-    Proof (.seq ↑(xs ++ (.or a b) :: ys) ↑gs)
+    Proof (.seq ↑(xs ++ (a ∨∨ b) :: ys) ↑gs)
   -- ∀ a b Γ Δ , (Γ ⊢ a, b, Δ) → (Γ ⊢ a ∨ b, Δ)
   | orr :
     ∀ (a b : Form) (xs ys zs gs: List Form),
-      Proof (.seq ↑xs ↑(ys ++ a :: zs ++ b :: gs)) →   --TODO: a ja b järjekord ei tohiks oleneda
-      Proof (.seq ↑xs ↑(ys ++ (.or a b) :: gs))
+      Proof (.seq ↑xs ↑(ys ++ a :: zs ++ b :: gs)) →
+      Proof (.seq ↑xs ↑(ys ++ ( a ∨∨ b) :: gs))
   -- ∀ a b Γ Δ, (a, Γ ⊢ b) → ( Γ ⊢ a → b, Δ)
   | impr :
     ∀ (a b : Form) (xs ys gs zs: List Form),
       Proof (.seq ↑(xs ++ a :: ys) {b}) →
-      Proof (.seq ↑(xs ++ ys) ↑(gs ++ (.imp a b)::zs)) --succ järjestus
+      Proof (.seq ↑(xs ++ ys) ↑(gs ++ (a ⊃ b)::zs)) --succ järjestus
   -- ∀ a b Γ Δ, (a → b, Γ ⊢ a, Δ) → (b, Γ ⊢ Δ) → (a → b, Γ ⊢ Δ)
   | impl :
     ∀ (a b : Form) (xs ys gs zs: List Form),
-      Proof (.seq ↑(xs ++ (.imp a b) :: ys) ↑(gs ++ a :: zs)) →
+      Proof (.seq ↑(xs ++ (a ⊃ b) :: ys) ↑(gs ++ a :: zs)) →
       Proof (.seq ↑(xs ++ b :: ys ) ↑(gs++zs)) →
-      Proof (.seq ↑(xs ++ (.imp a b) :: ys) ↑(gs++zs))
+      Proof (.seq ↑(xs ++ (a ⊃ b) :: ys) ↑(gs++zs))
   -- ∀ a b Γ Δ, (Γ ⊢ b, Δ) → (Γ ⊢ a → b, Δ)
   | afort :
     ∀ (a b : Form) (xs ys gs : List Form),
       Proof (.seq ↑xs ↑(ys ++ b :: gs)) →
-      Proof (.seq ↑xs ↑(ys ++ (.imp a b) :: gs))
+      Proof (.seq ↑xs ↑(ys ++ (a ⊃ b) :: gs))
 
 --deriving Repr
 open Proof
@@ -128,9 +127,12 @@ def size_sum : List Form → Nat
   | f :: fs => sizeOf_Form f + size_sum fs
 
 @[simp]
-def termination_metric (s : Seq4Proof) : Nat × Nat:=
+def termination_metric (s : Seq4Proof) : Nat  :=
 match s with
-  | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ usedImps₂  => ( size_sum imps₁ , size_sum forms₁ + size_sum forms₂) --TODO what to do with imps₂??
+  | .seq4 atoms₁ [] imps₁ usedImps₁ atoms₂ [] imps₂ usedImps₂ =>
+
+    (size_sum imps₁ + size_sum imps₂)
+  | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ usedImps₂  => ( size_sum forms₁ + size_sum forms₂) --TODO what to do with imps₂??
 
 
 /- find common atoms in anticident atoms list and succedent atoms list. current: wo duplicates
@@ -145,10 +147,16 @@ def findIntersection : List Atom → List Atom → List Atom
       else y :: findIntersection xs ys
     else findIntersection xs ys
 
-#eval findIntersection [.atom₁] [.atom₁, .atom₂, .atom₁]
+#eval findIntersection [Atom.mk 1] [Atom.mk 1, Atom.mk 2, Atom.mk 1]
+
+#check (Atom.mk 1 : multiSucc.Atom)
+#check (Atom.mk 1 : Atom)
+#check ([multiSucc.Atom.mk 1] : List multiSucc.Atom)
+#check (multiSucc.Atom.mk 1) ∈ [multiSucc.Atom.mk 1]
+
 
 theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
-  ∀ xatom ∈ (findIntersection xs ys), xatom ∈ xs ∧ xatom ∈ ys :=
+  ∀ x ∈ (findIntersection xs ys), x ∈ xs ∧ x ∈ ys :=
   λ xatom xatom_in =>
   match ys with
   | [] => by simp [findIntersection] at xatom_in
@@ -238,7 +246,7 @@ def findAtomicProofs (xs: List Atom)  (as : List Atom)
 
 
 
-lemma neg_eq_imp_bot (a : Form) :  .neg a = Form.imp a Form.bot := by rfl
+lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 /- METARULES
 1. formula x can be principal of R→ (impr) only once
@@ -272,7 +280,7 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
             | [] => []
             | (.imp a b) :: imps /- | (.neg a) :: succForms -/ => by --METARULE 1
               if (.imp a b) ∉ usedImps₂ then
-                have h₁ := automatedProof (.seq4 as [a] ( usedImps₁) [] [] [b] [] ((.imp a b)::usedImps₂) ) --move all usedimps back. TERMINATION PROBLEM
+                have h₁ := automatedProof (.seq4 as [a] ( usedImps₁) [] [] [b] [] ((a ⊃ b)::usedImps₂) ) --move all usedimps back. TERMINATION PROBLEM
                 simp at h₁
                 have h₂ := List.map (impr a b (as.map .atoms) ( usedImps₁) (bs.map .atoms) imps) h₁
                 unfold seqAtoms2seq; simp
@@ -285,7 +293,7 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
                 exact h₂
             | _ => []
           | (.imp a b) :: xs => by
-            have pair₁ := automatedProof (.seq4 as [] xs ((.imp a b) :: usedImps₁) bs [a] imps₂ usedImps₂ )
+            have pair₁ := automatedProof (.seq4 as [] xs ((a ⊃ b) :: usedImps₁) bs [a] imps₂ usedImps₂ )
             have pair₂ := automatedProof (.seq4 as [b] xs (/- (.imp a b) :: -/ usedImps₁) bs [] imps₂ usedImps₂) -- by rule i cant keep copy of .imp a b in usedImps₁, do i need to?
             simp at pair₁; simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at pair₂; --rw [← List.append_assoc [] imps₁ usedImps₁] at pair₂
             have hΓ :  Multiset.ofList (List.map Form.atoms as ++ (xs ++ a.imp b :: usedImps₁)) =
@@ -313,17 +321,12 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
         unfold seqAtoms2seq; simp
         unfold seqAtoms2seq at h; simp at h
         exact h
-      | .bot :: succForms =>  by --botr rule, .bot is ignored
+      | ⊥ :: succForms =>  by --botr rule, .bot is ignored
         have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms imps₂ usedImps₂)
         simp at h; rw [← List.append_assoc] at h
         have rule := List.map (botr ((as.map .atoms)++imps₁++usedImps₁) (bs.map .atoms) (succForms ++ imps₂)) h
         unfold seqAtoms2seq; simp
         simp at rule
-        /- have Γ : Multiset.ofList (List.map .atoms bs ++ (succForms ++ [.bot])) =
-                 Multiset.ofList (List.map .atoms bs ++ .bot :: succForms) := by
-                 simp [Multiset.coe_eq_coe]; rw [List.perm_append_left_iff] ; apply List.perm_append_singleton
- -/
-        --rw [Γ] at rule
         exact rule
 
       | (.and a b) :: succForms => by
@@ -389,14 +392,16 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
 
 termination_by (termination_metric s)
 decreasing_by
-. simp; simp only [size_sum]; apply Prod.Lex.left; simp
+. simp; simp only [size_sum]; simp; grind
 . simp; apply Prod.Lex.left; simp only [size_sum]; simp
 . simp; apply Prod.Lex.right; simp only [size_sum]; simp
-. sorry
-. simp; apply Prod.Lex.right; simp only [size_sum]; simp; rw [add_comm 1 _];
-  refine Nat.lt_add_right (sizeOf_Form b) ?_
-  apply Nat.lt_succ_self
-. simp; apply Prod.Lex.right; simp only [size_sum]; simp
+. simp; sorry
+. simp; simp only [size_sum]; simp; grind
+  have h : ¬(succForms = []) := by sorry
+  -- prove this from context
+
+
+. simp; simp only [size_sum]; simp
 . simp; apply Prod.Lex.right; simp only [size_sum]; simp
   rw [add_assoc, add_assoc, add_comm 1 _]
   apply Nat.lt_succ_self
@@ -410,11 +415,11 @@ decreasing_by
   refine Nat.lt_add_right (size_sum succForms) ?_
   apply Nat.lt_succ_self
    -/
-. apply Prod.Lex.right; simp only [size_sum]; simp
-. apply Prod.Lex.right; simp only [size_sum]; simp
-. apply Prod.Lex.right; simp only [size_sum]; simp;
+. simp; simp only [size_sum]; simp
+. simp; --moving the .imp just to different list, how to show termination?
+. simp; simp only [size_sum]; simp;
   rw [add_assoc, add_assoc ,add_comm 1 _]; apply Nat.lt_succ_self
-. apply Prod.Lex.right; simp only [size_sum]; simp; rw [add_comm 1 _]
+. simp; apply Prod.Lex.right; simp only [size_sum]; simp; rw [add_comm 1 _]
   refine Nat.lt_add_right (sizeOf_Form b) ?_
   apply Nat.lt_succ_self
 . apply Prod.Lex.right; simp only [size_sum]; simp
@@ -430,9 +435,10 @@ decreasing_by
 instance : ToString Atom where
   toString a :=
     match a with
-    | .atom₁ => "p"
-    | .atom₂ => "q"
-    | .atom₃ => "r"
+    | .mk 1 => "p"
+    | .mk 2 => "q"
+    | .mk 3 => "r"
+    | .mk _ => "undefined"
 
 def formToString (xform : Form) : String :=
    match xform with
@@ -441,7 +447,7 @@ def formToString (xform : Form) : String :=
     | .neg a => "¬" ++ formToString a
     | .and a b => "(" ++ formToString a ++ " ∧ " ++ formToString b ++ ")"
     | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
-    | .imp a b => "(" ++ formToString a ++ " → " ++ formToString b ++ ")"
+    | .imp a b => "(" ++ formToString a ++ " ⊃ " ++ formToString b ++ ")"
 
 instance : ToString Form where
   toString xform := formToString xform
@@ -454,10 +460,14 @@ instance : ToString Form where
 @[simp]
 def Form.encode : Form → List Nat
   | bot        => [0]
-  | atoms a    => [1, a.toNat]
+  | atoms a    => [1, a.atom]
   | and f g    => [2, (encode f).length] ++ encode f ++ encode g
   | or f g     => [3, (encode f).length] ++ encode f ++ encode g
   | imp f g    => [4, (encode f).length] ++ encode f ++ encode g
+
+lemma Atom.ext {a b : Atom} (h : a.atom = b.atom) : a = b := by
+  cases a; cases b
+  simp_all
 
 theorem form_inj {f : Form} (h : f.encode = g.encode) :
   f = g := by
@@ -466,10 +476,8 @@ theorem form_inj {f : Form} (h : f.encode = g.encode) :
   | .bot, .atoms _ => simp only [Form.encode, List.cons.injEq, zero_ne_one, List.ne_cons_self, and_self] at h
   | .atoms _, .bot => simp at h
   | .atoms a, .atoms b =>
-    simp only [Form.encode, Atom.toNat, List.cons.injEq, and_true, true_and] at h
-    match a, b with
-    | .atom₁, .atom₁ | .atom₃, .atom₃ | .atom₂, .atom₂ => rfl
-    | .atom₁, .atom₂ | .atom₁, .atom₃ | .atom₂, .atom₁ | .atom₂, .atom₃ | .atom₃, .atom₁ | .atom₃, .atom₂ => simp at h
+    simp only [Form.encode, Atom.mk, List.cons.injEq, and_true, true_and] at h
+    apply congrArg Form.atoms (Atom.ext h)
   | .and f g, .and f' g' =>
     simp_all
     let ⟨h1,h2⟩ := h
@@ -503,7 +511,7 @@ instance : LinearOrder Form :=
    Since `Form` is made up of `Atom` and `Form`, we need to take into account both
 -/
 def example1 : Multiset Nat := {3, 1, 2, 2}
-def example2 : Multiset Form := {.atoms .atom₁, .bot, .bot}
+def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 
 /-
    We can turn multisets into (computable) sorted lists with `sort`
