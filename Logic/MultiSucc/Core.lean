@@ -18,7 +18,7 @@ inductive Form
 | imp : Form → Form → Form
 deriving DecidableEq, Repr
 
-
+-- such notation is used as not to confuse with Lean's internal logic notation
 notation "⊥" => Form.bot
 infixl:50 " ∧∧ " => Form.and
 infixl:50 " ∨∨ " => Form.or

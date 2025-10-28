@@ -13,24 +13,6 @@ import Logic.MultiSucc.Syntax
 
 namespace multiSucc
 open multiSucc
-/-
-  We need a way to order `Atom`s so we assign each constructor a unique number
-  So our canonical order is `atom₁ ≤ atom₂ ≤ atom₃`
--/
-/- def Atom.toNat : Atom → Nat
-  | .atom₁ => 0
-  | .atom₂ => 1
-  | .atom₃ => 2 -/
-
-  -- as an exercise you can prove this
-/- theorem atom_inj {a : Atom} (h : a.toNat = b.toNat) : a = b := by
-  --unfold Atom.toNat at h
-  cases a
-  <;>  cases b -- <;> applies tactic on all subgoals
-  <;> simp [Atom.toNat] at h
-  <;> rfl -/
-
-
 
 /-
 Atomic values get valued as one , not as 0, to help show termination for the atomic case in antecedent.
@@ -135,7 +117,8 @@ match s with
   | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ usedImps₂  => ( size_sum forms₁ + size_sum forms₂) --TODO what to do with imps₂??
 
 
-/- find common atoms in anticident atoms list and succedent atoms list. current: wo duplicates
+/- find common atoms in anticident atoms list and succedent atoms list.
+  current: wo duplicates
   Maybe return positions, to be precise, List (Atom, (index from xs, index from ys)) -/
 def findIntersection : List Atom → List Atom → List Atom
 -- xs.filter (fun a => a ∈ ys) |>.eraseDups
@@ -149,11 +132,7 @@ def findIntersection : List Atom → List Atom → List Atom
 
 #eval findIntersection [Atom.mk 1] [Atom.mk 1, Atom.mk 2, Atom.mk 1]
 
-#check (Atom.mk 1 : multiSucc.Atom)
-#check (Atom.mk 1 : Atom)
-#check ([multiSucc.Atom.mk 1] : List multiSucc.Atom)
-#check (multiSucc.Atom.mk 1) ∈ [multiSucc.Atom.mk 1]
-
+--TODO when findIntersection empty, no overlapping atoms in either lists
 
 theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
   ∀ x ∈ (findIntersection xs ys), x ∈ xs ∧ x ∈ ys :=
@@ -217,7 +196,6 @@ def findAtomicProofs (xs: List Atom)  (as : List Atom)
   | x :: xs' => by
     -- remove intersection atom x from atomic lists, as in rule
     have proof := ax (.atoms x) (List.map .atoms (as.erase x)) (imps₁ ++ usedImps₁) (List.map .atoms (bs.erase x)) imps₂
-    --have proof := ax (.atoms x) (List.map .atoms as) (imps₁ ++ usedImps₁) (List.map atoms bs) []
     simp
 
     have h : x ∈ (findIntersection as bs) := by simp [hxs]
@@ -452,7 +430,7 @@ def formToString (xform : Form) : String :=
 instance : ToString Form where
   toString xform := formToString xform
 
----------HELPED-------------
+
 /-
   Ordering formulas is more tricky since we are dealing with tree-like structures
   We encode them into lists of nats (question: can we use `Nat` as encoding? Why or why not?)
@@ -538,34 +516,62 @@ instance : ToString Seq4Proof where
   (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map formToString imps₁).toString
   ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString
 
+def indent (n : Nat) (s : String) : String :=
+  String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
+
+def horizontalLine (n : Nat) : String :=
+  String.join (List.replicate n "-")
+
 def listToString (xs : List Form) : String :=
   String.intercalate ", " (xs.map formToString)
 
-def proofToString {xseq : Sequent} : Proof xseq → String
+def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String
 | .ax x xs ys gs zs  =>
-  s!"AX: {formToString x}, {listToString xs}, {listToString ys} ⊢ {formToString x}, {listToString gs}, {listToString zs} "
+  indent indentLvl s!"AX: {formToString x}, {listToString xs}, {listToString ys} ⊢ {formToString x}, {listToString gs}, {listToString zs} "
 | .botl xs ys gs =>
-  s!"⊥L: ⊥, {listToString xs}, {listToString ys} ⊢ {listToString gs}"
+  indent indentLvl s!"⊥L: ⊥, {listToString xs}, {listToString ys} ⊢ {listToString gs}"
 | .botr xs ys gs proof =>
-  s!"{proofToString proof} \n ⊥R:  {listToString xs} ⊢ ⊥ {listToString ys} , {listToString gs}"
+  let premise := proofToString (indentLvl + 1) proof
+  let ruleLine :=
+  s!"⊥R: {listToString xs} ⊢ ⊥, {listToString ys}, {listToString gs}"
+  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .andl a b xs ys gs proof =>
-  s!"{proofToString proof} \n ∧L: ({formToString a} ∧ {formToString b}), {listToString xs}, {listToString ys} ⊢ {listToString gs}"
+  let premise := proofToString (indentLvl + 1) proof
+  let ruleLine := s!"∧L: ({formToString a} ∧ {formToString b}), {listToString xs}, {listToString ys} ⊢ {listToString gs}"
+  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .andr a b xs ys gs proof₁ proof₂=>
-  s!"{proofToString proof₁}  |  {proofToString proof₂} \n ∧R: {listToString xs} ⊢ {formToString a} ∧ {formToString b}, {listToString ys}, {listToString gs}"
+  let left := proofToString  (indentLvl + 1) proof₁
+  let right := proofToString (indentLvl + 1) proof₂
+  let ruleLine := s!"∧R: {listToString xs} ⊢ {formToString a} ∧ {formToString b}, {listToString ys}, {listToString gs}"
+  s!"{left}\n{right}\n{indent indentLvl (horizontalLine (ruleLine.length))}\n{indent indentLvl ruleLine}"
 | .orl a b xs ys gs proof₁ proof₂=>
-  s!"{proofToString proof₁} | {proofToString proof₂} \n ∨L: ({formToString a} ∨ {formToString b}), {listToString xs}, {listToString ys} ⊢ {listToString gs}"
+  let left := proofToString  (indentLvl + 1) proof₁
+  let right := proofToString (indentLvl + 1) proof₂
+  let ruleLine := s!"∨L: ({formToString a} ∨ {formToString b}), {listToString xs}, {listToString ys} ⊢ {listToString gs}"
+  s!"{left}\n{right}\n{horizontalLine (ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .orr a b xs ys zs gs proof =>
-  s!"{proofToString proof} \n ∨R: {listToString xs} ⊢ {formToString a} ∨ {formToString b}, {listToString ys}, {listToString zs}, {listToString gs}"
+  let premise := proofToString (indentLvl + 1) proof
+  let ruleLine := s!" ∨R: {listToString xs} ⊢ {formToString a} ∨ {formToString b}, {listToString ys}, {listToString zs}, {listToString gs}"
+  s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impl a b xs ys gs zs proof₁ proof₂ =>
-  s!"{proofToString proof₁}  |  {proofToString proof₂} \n →L: ({formToString a} → {formToString b}), {listToString xs}, {listToString ys} ⊢ {listToString gs}, {listToString zs}"
+  let left  := proofToString (indentLvl + 1) proof₁
+  let right := proofToString (indentLvl + 1) proof₂
+  let ruleLine := s!"→L: ({formToString a} → {formToString b}), {listToString xs}, {listToString ys} ⊢ {listToString gs}, {listToString zs}"
+  s!"{left}\n{right}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impr a b xs ys gs zs proof  =>
-  s!"{proofToString proof} \n →R: {listToString xs}, {listToString ys} ⊢ {formToString a} → {formToString b}, {listToString gs}, {listToString zs}"
+  let premise := proofToString (indentLvl + 1) proof
+  let ruleLine := s!"→R: {listToString xs}, {listToString ys} ⊢ {formToString a} → {formToString b}, {listToString gs}, {listToString zs}"
+  s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .afort a b xs ys gs proof  =>
-  s!"{proofToString proof} \n →a fortiori: {listToString xs} ⊢ {formToString a} → {formToString b}, {listToString ys}, {listToString gs}"
+  let premise := proofToString (indentLvl + 1) proof
+  let ruleLine := s!"→a fortiori: {listToString xs} ⊢ {formToString a} → {formToString b}, {listToString ys}, {listToString gs}"
+  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
+
 
 def listProofToString : List (Proof xseq) → String
 | [] => ""
-| x::xs => (proofToString x).replace " ," "" ++ listProofToString xs
+| x::xs => (proofToString 0 x).replace " ," "" ++ "\n \n" ++ listProofToString xs
+
 
 instance : ToString (List (Proof xseq)) where
   toString proof := listProofToString proof
