@@ -59,16 +59,6 @@ inductive Proof : Sequent → Type
   | botl :
     ∀ (x : Form) (xs ys : List Form),
       Proof (.seq (xs ++ .bot :: ys) x)
-  -- ∀ a Γ, (Γ, a ⊢ ⊥) → (Γ ⊢ ¬a)
-  | negr :
-    ∀ (x : Form) (xs ys : List Form),
-            Proof (.seq (xs ++ x :: ys) .bot) →
-            Proof (.seq (xs ++ ys) (.neg x))
-  -- ∀ a b Γ, (Γ, ¬a ⊢ a) → (Γ, ¬a ⊢ b)
-  | negl :
-    ∀ (x y : Form) (xs ys : List Form),
-            Proof (.seq (xs ++ ys ++ [.neg x]) x) → -- copy of .neg x in context, also as last elem bc equality error in proof func
-            Proof (.seq (xs ++ (.neg x) :: ys) y)
   -- ∀ a b c Γ, (Γ, a, b ⊢ c) → (Γ, a ∧ b ⊢ c)
   | andl :
     ∀ (a b c : Form) (xs ys : List Form),
@@ -80,6 +70,16 @@ inductive Proof : Sequent → Type
       Proof (.seq xs a) →
       Proof (.seq xs b) →
       Proof (.seq xs (.and a b))
+  -- ∀ a Γ, (Γ, a ⊢ ⊥) → (Γ ⊢ ¬a)
+  | negr :
+    ∀ (x : Form) (xs ys : List Form),
+            Proof (.seq (xs ++ x :: ys) .bot) →
+            Proof (.seq (xs ++ ys) (.neg x))
+  -- ∀ a b Γ, (Γ, ¬a ⊢ a) → (Γ, ¬a ⊢ b)
+  | negl :
+    ∀ (x y : Form) (xs ys : List Form),
+            Proof (.seq (xs ++ ys ++ [.neg x]) x) → -- copy of .neg x in context, also as last elem bc equality error in proof func
+            Proof (.seq (xs ++ (.neg x) :: ys) y)
   -- ∀ a b c Γ, (a, Γ ⊢ c) → (b, Γ ⊢ c) → (a ∨ b, Γ ⊢ c)
   | orl :
     ∀ (a b c : Form) (xs ys : List Form),

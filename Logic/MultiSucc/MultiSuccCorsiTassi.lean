@@ -108,8 +108,70 @@ def size_sum : List Form → Nat
   | [] => 0
   | f :: fs => sizeOf_Form f + size_sum fs
 
+--eligibility to be principle rules based on metarules
+def countPrinciple (toCheck: List Form) (nonusable: List Form): List Form :=
+match toCheck with
+  | [] => []
+  | x :: xs => if x ∈ nonusable then countPrinciple xs nonusable
+               else x :: countPrinciple xs nonusable
+
+--complexity of set of principle formulas: nr of logical symbols occuring in them
+def complexity (xs : List Form): Nat :=
+match xs with
+  | [] => 0
+  | x :: xs =>
+    match x with
+    | .bot | .atoms _ => complexity xs
+    | .and a b | .or a b | .imp a b=> 1 + complexity (a:: b:: xs)
+termination_by (size_sum xs, xs.length )
+decreasing_by
+all_goals simp; sorry
+
+structure Fat where
+  x : Nat
+
 @[simp]
-def termination_metric (s : Seq4Proof) : Nat  :=
+instance : LT Fat where
+ lt a b := a.x > b.x
+
+@[simp]
+instance : SizeOf Fat where
+  sizeOf a := a.x
+
+--weight function based on paper to prove termination :
+--(r,n) where r is nr of R→ occurences there has been in this branch and
+--n is the complexity of the set of forms that can be used as principle to any rule
+def Seq4Proof.weight (p : Seq4Proof) : ( Fat × Fat) :=
+match p with
+| .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ usedImps₂  =>
+    let cL := complexity (countPrinciple forms₁ usedImps₁)-- forms in usedImps₁ can not be principle
+    let cR := complexity forms₂ --any imp on right side can be principle, bc either a fort is used or R→
+    let cImpL := complexity imps₁
+    let cImpR := complexity imps₂
+
+  (⟨List.length usedImps₂⟩, ⟨cL + cR + cImpL + cImpR⟩)
+
+def Seq4Proof.r: Seq4Proof → Nat := (·.weight.fst.x)
+def Seq4Proof.n: Seq4Proof → Nat := (·.weight.snd.x)
+
+@[simp]
+instance : SizeOf (OrderDual Nat) where
+  sizeOf n := OrderDual.ofDual n
+
+@[simp]
+theorem Seq4Proof.sizePf_lt_iff (a b: Seq4Proof) :
+    Prod.Lex (fun a₁ a₂ => a₁.x < a₂.x) (fun a₁ a₂ => a₁.x < a₂.x) b.weight a.weight
+    ↔
+  a.r > b.r ∨ (a.r = b.r ∧ a.n < b.n) := by
+  simp [r, n, Prod.lex_def]; rw [eq_comm]; rfl
+
+/- @[simp]
+instance: LT Seq4Proof where
+  lt:= term_metric
+ -/
+
+@[simp]
+def termination_metric (s : Seq4Proof) : (Nat)  :=
 match s with
   | .seq4 atoms₁ [] imps₁ usedImps₁ atoms₂ [] imps₂ usedImps₂ =>
 
@@ -132,7 +194,7 @@ def findIntersection : List Atom → List Atom → List Atom
 
 #eval findIntersection [Atom.mk 1] [Atom.mk 1, Atom.mk 2, Atom.mk 1]
 
---TODO when findIntersection empty, no overlapping atoms in either lists
+--TODO theorem: when findIntersection empty, no overlapping atoms in either lists
 
 theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
   ∀ x ∈ (findIntersection xs ys), x ∈ xs ∧ x ∈ ys :=
@@ -240,7 +302,7 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
    või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
  -/
 
-partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
+def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
   match s with
   | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ usedImps₂ =>
     match forms₁ with
@@ -368,9 +430,10 @@ partial def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
                 simp only [List.append_assoc,List.cons_append, List.nil_append, List.perm_middle]
       simp [hΓ] at h; exact h
 
-termination_by (termination_metric s)
+termination_by s.weight
 decreasing_by
-. simp; simp only [size_sum]; simp; grind
+. simp; simp only [weight]; simp only [List.length_cons, Prod.lex_def, -add_eq_left, reduceCtorEq,
+  -false_and, -or_self]
 . simp; apply Prod.Lex.left; simp only [size_sum]; simp
 . simp; apply Prod.Lex.right; simp only [size_sum]; simp
 . simp; sorry
@@ -592,7 +655,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
 --modusponens "a → b, a ⊢ β"
 #eval automatedProofHelper (seq {(p → q), p ⊢ q})
-#eval automatedProofHelper (seq {(p ∨ q), ¬p ⊢ q}) --Works, so negation works
+#eval automatedProofHelper (seq {(p ∨ q), ¬p ⊢ q})
 #eval automatedProofHelper (seq {p ⊢ (q ∨ p)})
 
 #eval automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
