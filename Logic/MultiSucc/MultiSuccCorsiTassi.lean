@@ -18,14 +18,21 @@ open multiSucc
 Atomic values get valued as one , not as 0, to help show termination for the atomic case in antecedent.
 Bottom is valued as 0, for it is semantically different from all others and does not "add complexity" to our sequent
  -/
-@[simp]
+@[simp, grind]
 def sizeOf_Form : Form → Nat
-  | ⊥ => 0
+  | ⊥ => 1
   | .atoms _ => 1
   | .and p q => 1 + sizeOf_Form p + sizeOf_Form q
   | .or p q => 1 + sizeOf_Form p + sizeOf_Form q
   | .imp p q => 1 + sizeOf_Form p + sizeOf_Form q
 
+@[simp, grind]
+def sizeOf_Form_increased : Form → Nat
+  | ⊥ => 2
+  | .atoms _ => 2
+  | .and p q => 2 + sizeOf_Form_increased p + sizeOf_Form_increased q
+  | .or p q => 2 + sizeOf_Form_increased p + sizeOf_Form_increased q
+  | .imp p q => 2 + sizeOf_Form_increased p + sizeOf_Form_increased q
 
 /-
 Multi-succedent formulas Added a fortiori
@@ -86,15 +93,6 @@ inductive Proof : Sequent → Type
 open Proof
 
 
-/-
-needed to find all possible pairings (of proofs) for cases like or, and ...
- -/
-def getPairs (xs : List α ) (ys : List β ) : List (α × β) :=
-  match xs with
-  | [] => []
-  | x::xs' => List.map (λ y => (x , y)) ys ++ getPairs xs' ys
-
-
 @[simp]
 def seqAtoms2seq (s : Seq4Proof) : Sequent :=
   match s with
@@ -104,11 +102,29 @@ def seqAtoms2seq (s : Seq4Proof) : Sequent :=
     Sequent.seq ant succ
 
 
+/- @[grind,simp]
 def size_sum : List Form → Nat
   | [] => 0
   | f :: fs => sizeOf_Form f + size_sum fs
 
+@[grind,simp]
+def size_sum_increased : List Form → Nat
+  | [] => 0
+  | f :: fs => sizeOf_Form_increased f + size_sum_increased fs -/
+
+@[grind,simp]
+def size_sum : List Form → Nat
+  | [] => 0
+  | f :: fs => 2* sizeOf_Form f + size_sum fs
+
+@[grind,simp]
+def size_sum_increased : List Form → Nat
+  | [] => 0
+  | f :: fs => 2 * sizeOf_Form f + 1 + size_sum_increased fs
+
+
 --eligibility to be principle rules based on metarules
+@[grind,simp]
 def countPrinciple (toCheck: List Form) (nonusable: List Form): List Form :=
 match toCheck with
   | [] => []
@@ -116,8 +132,10 @@ match toCheck with
                else x :: countPrinciple xs nonusable
 
 --complexity of set of principle formulas: nr of logical symbols occuring in them
-def complexity (xs : List Form): Nat :=
-match xs with
+@[grind,simp]
+def complexity (xs : List Form): Nat := size_sum xs
+
+/- match xs with
   | [] => 0
   | x :: xs =>
     match x with
@@ -125,58 +143,96 @@ match xs with
     | .and a b | .or a b | .imp a b=> 1 + complexity (a:: b:: xs)
 termination_by (size_sum xs, xs.length )
 decreasing_by
-all_goals simp; sorry
+all_goals simp; sorry -/
 
-structure Fat where
-  x : Nat
+@[grind,simp]
+def countImps (x : Form) : Nat :=
+match x with
+  | .bot | .atoms _ =>  0
+  | .and a b | .or a b => countImps a + countImps b
+  | .imp a b => 1 + countImps a + countImps b
 
-@[simp]
-instance : LT Fat where
- lt a b := a.x > b.x
-
-@[simp]
-instance : SizeOf Fat where
-  sizeOf a := a.x
 
 --weight function based on paper to prove termination :
 --(r,n) where r is nr of R→ occurences there has been in this branch and
 --n is the complexity of the set of forms that can be used as principle to any rule
-def Seq4Proof.weight (p : Seq4Proof) : ( Fat × Fat) :=
+@[grind]
+structure Weight (cap : ℕ) where
+  r : ℕ
+  n : ℕ
+  hr : r ≤ cap
+
+namespace Weight
+
+@[simp]
+instance instLT (cap : ℕ) : LT (Weight cap) where
+  lt a b := a.r > b.r ∨ a.r = b.r ∧ a.n < b.n
+
+instance instWellFoundedRelation {cap : ℕ} : WellFoundedRelation (Weight cap) where
+  rel a b := a < b
+  wf := by
+    simp only [instLT]
+    let rel' : WellFoundedRelation (Weight cap) :=
+      invImage (fun x ↦ ⟨cap - x.r, x.n⟩) Prod.instWellFoundedRelation
+    convert rel'.wf with a b
+    simp only [WellFoundedRelation.rel, rel']
+    grind [InvImage, Nat.lt_wfRel, sizeOf_nat]
+
+end Weight
+
+-- max nr of R→ is the ones already used+ imps in succ
+@[simp, grind]
+def Seq4Proof.cap (p : Seq4Proof) : ℕ :=
 match p with
+| .seq4 _  forms₁ imps₁ usedImps₁ _ forms₂ imps₂ usedImps₂  =>
+  (forms₁.map countImps).sum + (imps₁.map countImps).sum + usedImps₁.length + -- left side nested imps might move to right side
+   usedImps₂.length + (imps₂.map countImps).sum + (forms₂.map countImps).sum -- usedImps.length is usage of R→ already, only count top level imps. others nested too
+
+@[simp, grind]
+def Seq4Proof.r (p: Seq4Proof) : ℕ :=
+match p with
+| .seq4 _ _ _ _ _ _ _ usedImps₂  => usedImps₂.length -- occurences of R→ so far
+
+def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ) (hr : p.r ≤ cap ): Weight cap :=
+match _ : p with
 | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ usedImps₂  =>
-    let cL := complexity (countPrinciple forms₁ usedImps₁)-- forms in usedImps₁ can not be principle
-    let cR := complexity forms₂ --any imp on right side can be principle, bc either a fort is used or R→
-    let cImpL := complexity imps₁
-    let cImpR := complexity imps₂
+    let cL := size_sum_increased forms₁--(countPrinciple forms₁ usedImps₁)-- forms in usedImps₁ can not be principle
+    let cR := size_sum_increased forms₂ --any imp on right side can be principle, bc either a fort is used or R→
+    let cImpL := size_sum imps₁
+    let cImpR := size_sum imps₂
+    let n := cL + cR + cImpL + cImpR
+    { r := p.r, n := n, hr := by simp_all }
 
-  (⟨List.length usedImps₂⟩, ⟨cL + cR + cImpL + cImpR⟩)
 
-def Seq4Proof.r: Seq4Proof → Nat := (·.weight.fst.x)
-def Seq4Proof.n: Seq4Proof → Nat := (·.weight.snd.x)
+/- def f (cap : ℕ) (p : Seq4Proof) : ℕ :=
+  if p.x = 0 then
+    0
+  else
+    f cap ⟨p.x + 1⟩
+termination_by p.weight cap
+decreasing_by
+  simp
+  sorry -/
 
-@[simp]
-instance : SizeOf (OrderDual Nat) where
-  sizeOf n := OrderDual.ofDual n
 
-@[simp]
-theorem Seq4Proof.sizePf_lt_iff (a b: Seq4Proof) :
-    Prod.Lex (fun a₁ a₂ => a₁.x < a₂.x) (fun a₁ a₂ => a₁.x < a₂.x) b.weight a.weight
-    ↔
-  a.r > b.r ∨ (a.r = b.r ∧ a.n < b.n) := by
-  simp [r, n, Prod.lex_def]; rw [eq_comm]; rfl
+
 
 /- @[simp]
-instance: LT Seq4Proof where
-  lt:= term_metric
- -/
-
-@[simp]
 def termination_metric (s : Seq4Proof) : (Nat)  :=
 match s with
   | .seq4 atoms₁ [] imps₁ usedImps₁ atoms₂ [] imps₂ usedImps₂ =>
 
     (size_sum imps₁ + size_sum imps₂)
   | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ usedImps₂  => ( size_sum forms₁ + size_sum forms₂) --TODO what to do with imps₂??
+ -/
+
+/-
+needed to find all possible pairings (of proofs) for cases like or, and ...
+ -/
+def getPairs (xs : List α ) (ys : List β ) : List (α × β) :=
+  match xs with
+  | [] => []
+  | x::xs' => List.map (λ y => (x , y)) ys ++ getPairs xs' ys
 
 
 /- find common atoms in anticident atoms list and succedent atoms list.
@@ -290,9 +346,10 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 /- METARULES
 1. formula x can be principal of R→ (impr) only once
-   - so whenever we apply R→ rule, we place it to the succedent imp list
+   - so whenever we apply R→ rule, we place it to the succedent used imp list
+
 2. a fortiori can be applied to formula x only when it has been analyzed by R→ rule
-   - from succ forms list we  take a form and check if it is present in succ imps list, then can use a fortiori,
+   - from succ forms list we  take a form and check if it is present in succ used imps list, then can use a fortiori,
 
 3. between two occurrences of L→ , there is an occurrence of R→ (on any form) in between
    - so when applying L→ , we place the copy of form to usedImp list on the left
@@ -302,7 +359,7 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
    või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
  -/
 
-def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
+def automatedProof (s : Seq4Proof) (cap : ℕ) (hc : s.r ≤ cap := by grind): List (Proof (seqAtoms2seq s)) :=
   match s with
   | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ usedImps₂ =>
     match forms₁ with
@@ -320,21 +377,21 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
             | [] => []
             | (.imp a b) :: imps /- | (.neg a) :: succForms -/ => by --METARULE 1
               if (.imp a b) ∉ usedImps₂ then
-                have h₁ := automatedProof (.seq4 as [a] ( usedImps₁) [] [] [b] [] ((a ⊃ b)::usedImps₂) ) --move all usedimps back. TERMINATION PROBLEM
+                have h₁ := automatedProof (.seq4 as [a] ( usedImps₁) [] [] [b] [] ((a ⊃ b)::usedImps₂)) cap (by simp; sorry) --move all usedimps back. TERMINATION PROBLEM
                 simp at h₁
                 have h₂ := List.map (impr a b (as.map .atoms) ( usedImps₁) (bs.map .atoms) imps) h₁
                 unfold seqAtoms2seq; simp
                 exact h₂
               else -- HERE can try a fortiori METARULE 2
-                have h₁ := automatedProof (.seq4 as [] [] usedImps₁ bs  [b]  imps usedImps₂)
+                have h₁ := automatedProof (.seq4 as [] [] usedImps₁ bs  [b]  imps usedImps₂) cap
                 simp at h₁
                 have h₂ := List.map (afort a b ((as.map .atoms) ++ usedImps₁) (bs.map .atoms) imps) h₁
                 unfold seqAtoms2seq; simp only [List.append_nil]
                 exact h₂
             | _ => []
           | (.imp a b) :: xs => by
-            have pair₁ := automatedProof (.seq4 as [] xs ((a ⊃ b) :: usedImps₁) bs [a] imps₂ usedImps₂ )
-            have pair₂ := automatedProof (.seq4 as [b] xs (/- (.imp a b) :: -/ usedImps₁) bs [] imps₂ usedImps₂) -- by rule i cant keep copy of .imp a b in usedImps₁, do i need to?
+            have pair₁ := automatedProof (.seq4 as [] xs ((a ⊃ b) :: usedImps₁) bs [a] imps₂ usedImps₂ ) cap
+            have pair₂ := automatedProof (.seq4 as [b] xs (/- (.imp a b) :: -/ usedImps₁) bs [] imps₂ usedImps₂) cap-- by rule i cant keep copy of .imp a b in usedImps₁, do i need to?
             simp at pair₁; simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at pair₂; --rw [← List.append_assoc [] imps₁ usedImps₁] at pair₂
             have hΓ :  Multiset.ofList (List.map Form.atoms as ++ (xs ++ a.imp b :: usedImps₁)) =
               Multiset.ofList (List.map .atoms as ++ a.imp b :: (xs ++ usedImps₁)) := by
@@ -357,12 +414,12 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
           --exact findAtomicProofs' (x::xs) as (imps₁) (usedImps₁) bs (imps₂) (common)
 
       | (.atoms a) :: succForms => by --move atom to succ atoms list
-        have h := automatedProof (.seq4 as [] imps₁ usedImps₁  (bs++[a]) succForms imps₂ usedImps₂)
+        have h := automatedProof (.seq4 as [] imps₁ usedImps₁  (bs++[a]) succForms imps₂ usedImps₂) cap
         unfold seqAtoms2seq; simp
         unfold seqAtoms2seq at h; simp at h
         exact h
       | ⊥ :: succForms =>  by --botr rule, .bot is ignored
-        have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms imps₂ usedImps₂)
+        have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms imps₂ usedImps₂) cap
         simp at h; rw [← List.append_assoc] at h
         have rule := List.map (botr ((as.map .atoms)++imps₁++usedImps₁) (bs.map .atoms) (succForms ++ imps₂)) h
         unfold seqAtoms2seq; simp
@@ -370,8 +427,8 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
         exact rule
 
       | (.and a b) :: succForms => by
-        have pair1 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (a :: succForms) imps₂ usedImps₂)
-        have pair2 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (b :: succForms) imps₂ usedImps₂)
+        have pair1 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (a :: succForms) imps₂ usedImps₂) cap
+        have pair2 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (b :: succForms) imps₂ usedImps₂) cap
         unfold seqAtoms2seq at pair1; simp at pair1; rw [← List.append_assoc] at pair1
         unfold seqAtoms2seq at pair2; simp at pair2; rw [← List.append_assoc] at pair2
         have h := List.map (andr a b ((as.map .atoms)++ imps₁ ++ usedImps₁) (bs.map .atoms) (succForms++imps₂)).uncurry (getPairs pair1 pair2)
@@ -379,13 +436,13 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
         simp at h
         exact h
       | (.or a b) :: succForms => by
-        have h₁ := automatedProof (.seq4 as [] imps₁ usedImps₁ bs  (a :: b :: succForms) imps₂ usedImps₂)
+        have h₁ := automatedProof (.seq4 as [] imps₁ usedImps₁ bs  (a :: b :: succForms) imps₂ usedImps₂) cap
         simp at h₁; rw [← List.singleton_append, ← List.append_assoc, ← List.append_assoc] at h₁
         have h₂ := List.map (orr a b ((as.map .atoms) ++ imps₁ ++ usedImps₁) (bs.map .atoms) [] (succForms++imps₂)) h₁
         simp; simp [List.append_assoc] at h₂
         exact h₂
       | (.imp a b) :: succForms => by --METARULE 4 move to imps list
-        have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms ((.imp a b)::imps₂) usedImps₂ )
+        have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms ((.imp a b)::imps₂) usedImps₂ ) cap
         simp at h; simp
         have hΓ : Multiset.ofList (List.map Form.atoms bs ++ (succForms ++ a.imp b :: imps₂)) =
                   Multiset.ofList (List.map Form.atoms bs ++ a.imp b :: (succForms ++ imps₂)) := by
@@ -397,7 +454,7 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
 
     -- open up forms on left side --
     | (.atoms a) :: antForms => by
-      have h := automatedProof (.seq4 (as ++ [a]) antForms imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂)
+      have h := automatedProof (.seq4 (as ++ [a]) antForms imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
       simp at h; simp; exact h
     | .bot :: antForms => by
       have h:= [botl (as.map .atoms) (antForms++imps₁++usedImps₁) ((bs.map .atoms)++forms₂++imps₂)]
@@ -405,7 +462,7 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
       simp
       exact h
     | (.and a b) :: antForms => by
-      have h₁ := automatedProof (.seq4 as (a::b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂)
+      have h₁ := automatedProof (.seq4 as (a::b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
       simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at h₁
       rw [← List.append_assoc antForms imps₁ usedImps₁] at h₁; rw [← List.append_assoc] at h₁
       have h₂ := List.map (andl a b ((as.map .atoms)) (antForms++imps₁++ usedImps₁) ((bs.map .atoms)++forms₂++imps₂)) h₁
@@ -413,15 +470,15 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
       simp only [← List.cons_append, ← List.append_assoc] at h₂
       exact h₂
     | (.or a b) :: antForms => by
-      have pair₁ := automatedProof (.seq4 as (a::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂)
-      have pair₂ := automatedProof (.seq4 as (b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂)
+      have pair₁ := automatedProof (.seq4 as (a::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
+      have pair₂ := automatedProof (.seq4 as (b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
       simp at pair₁; rw [← List.append_assoc antForms imps₁ usedImps₁, ← List.append_assoc] at pair₁
       simp at pair₂; rw [← List.append_assoc antForms imps₁ usedImps₁, ← List.append_assoc] at pair₂
       have h := List.map (orl a b (as.map .atoms) (antForms++imps₁++ usedImps₁) ((bs.map .atoms)++forms₂++ imps₂)).uncurry (getPairs pair₁ pair₂)
       simp only [← List.cons_append, ← List.append_assoc] at h
       exact h
     | (.imp a b) :: antForms => by -- METARULE 4, move to imps, dont apply rule yet
-      have h := automatedProof (.seq4 as antForms ((.imp a b)::imps₁) usedImps₁ bs forms₂ imps₂ usedImps₂)
+      have h := automatedProof (.seq4 as antForms ((.imp a b)::imps₁) usedImps₁ bs forms₂ imps₂ usedImps₂) cap
       simp at h; simp
       have hΓ : Multiset.ofList (List.map Form.atoms as ++ (antForms ++ a.imp b :: (imps₁ ++ usedImps₁))) =
                 Multiset.ofList (List.map Form.atoms as ++ a.imp b :: (antForms ++ (imps₁ ++ usedImps₁))) := by
@@ -430,69 +487,24 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
                 simp only [List.append_assoc,List.cons_append, List.nil_append, List.perm_middle]
       simp [hΓ] at h; exact h
 
-termination_by s.weight
+termination_by s.weight cap (by simp_all; /- grind -/)
 decreasing_by
-. simp; simp only [weight]; simp only [List.length_cons, Prod.lex_def, -add_eq_left, reduceCtorEq,
-  -false_and, -or_self]
-. simp; apply Prod.Lex.left; simp only [size_sum]; simp
-. simp; apply Prod.Lex.right; simp only [size_sum]; simp
-. simp; sorry
-. simp; simp only [size_sum]; simp; grind
-  have h : ¬(succForms = []) := by sorry
-  -- prove this from context
-
-
-. simp; simp only [size_sum]; simp
-. simp; apply Prod.Lex.right; simp only [size_sum]; simp
-  rw [add_assoc, add_assoc, add_comm 1 _]
-  apply Nat.lt_succ_self
-. simp; simp only [size_sum]; simp-- difficult case, would work if first members could be a₁ ≠ a₂ then b₁ < b₂
-/-   have h : size_sum (imps₁ ++ usedImps₁) = size_sum imps₁ + size_sum usedImps₁ :=
-    by induction imps₁ with
-    | nil => simp [size_sum]
-    | cons x xs ih => simp [size_sum, ih]; rw [← Nat.add_assoc] -/
-  sorry
-  /- apply Prod.Lex.right; rw [add_assoc 1 _ _, add_comm 1 _]
-  refine Nat.lt_add_right (size_sum succForms) ?_
-  apply Nat.lt_succ_self
-   -/
-. simp; simp only [size_sum]; simp
-. simp; --moving the .imp just to different list, how to show termination?
-. simp; simp only [size_sum]; simp;
-  rw [add_assoc, add_assoc ,add_comm 1 _]; apply Nat.lt_succ_self
-. simp; apply Prod.Lex.right; simp only [size_sum]; simp; rw [add_comm 1 _]
-  refine Nat.lt_add_right (sizeOf_Form b) ?_
-  apply Nat.lt_succ_self
-. apply Prod.Lex.right; simp only [size_sum]; simp
-. apply Prod.Lex.right; simp only [size_sum]; simp
-  rw [add_assoc, add_comm _ (size_sum succForms + size_sum forms₂), add_comm _ (sizeOf_Form a), add_comm (sizeOf_Form a) _]
-  simp only [← add_assoc]
-  refine Nat.lt_add_right (sizeOf_Form b) ?_
-  apply Nat.lt_succ_self
-. apply Prod.Lex.right; simp only [size_sum]; simp
+all_goals simp [Seq4Proof.weight]; try grind
 
 
 ---------------------------------PARSING-----------------------------
 instance : ToString Atom where
-  toString a :=
-    match a with
-    | .mk 1 => "p"
-    | .mk 2 => "q"
-    | .mk 3 => "r"
-    | .mk _ => "undefined"
+  toString | .mk 1 => "p" | .mk 2 => "q" | .mk 3 => "r" | .mk _ => "undefined"
 
-def formToString (xform : Form) : String :=
-   match xform with
-    | .bot => "⊥"
-    | .atoms a => toString a
-    | .neg a => "¬" ++ formToString a
-    | .and a b => "(" ++ formToString a ++ " ∧ " ++ formToString b ++ ")"
-    | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
-    | .imp a b => "(" ++ formToString a ++ " ⊃ " ++ formToString b ++ ")"
+def formToString : Form → String
+  | .bot => "⊥"
+  | .atoms a => toString a
+  | .neg a => s!"¬{formToString a}"
+  | .and a b => s!"({formToString a} ∧ {formToString b})"
+  | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
+  | .imp a b => "(" ++ formToString a ++ " ⊃ " ++ formToString b ++ ")"
 
-instance : ToString Form where
-  toString xform := formToString xform
-
+instance : ToString Form := ⟨formToString⟩
 
 /-
   Ordering formulas is more tricky since we are dealing with tree-like structures
@@ -563,14 +575,14 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
    We need some canonical order to decide this so in our case, we can use `≤` for sorting
 -/
 
-#eval Multiset.sort LE.le example1
-#eval Multiset.sort LE.le example2
+#eval Multiset.sort example1 LE.le
+#eval Multiset.sort example2 LE.le
 
 instance : ToString Sequent where
   toString xseq :=
   match xseq with
-  | .seq Γ Δ => String.intercalate ", " (List.map formToString (Multiset.sort LE.le Γ))
-    ++ " ⊢ " ++ String.intercalate ", " (List.map formToString (Multiset.sort LE.le Δ))
+  | .seq Γ Δ => String.intercalate ", " (List.map formToString (Multiset.sort Γ LE.le ))
+    ++ " ⊢ " ++ String.intercalate ", " (List.map formToString (Multiset.sort Δ LE.le ))
 
 instance : ToString Seq4Proof where
   toString seq4 :=
@@ -642,14 +654,14 @@ instance : ToString (List (Proof xseq)) where
 
 def seq2seq4 : Sequent → Seq4Proof
 | .seq Δ Γ =>
-  have antecedent := Multiset.sort LE.le Δ
-  have succedent := Multiset.sort LE.le Γ
+  have antecedent := Multiset.sort Δ LE.le
+  have succedent := Multiset.sort Γ LE.le
   Seq4Proof.seq4 [] antecedent [] [] [] succedent [] []
 
 
 def automatedProofHelper (s : Sequent) : Std.Format :=
   have seq4 := seq2seq4 s
-  have proofs := automatedProof seq4
+  have proofs := automatedProof seq4 seq4.cap
   String.toFormat (listProofToString proofs)
 
 
@@ -660,11 +672,11 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
 #eval automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
 
-#eval automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))})
+#eval! automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))})
 
 #eval automatedProofHelper (seq {⊢ ¬¬ (¬p ∨ p)})
 #eval automatedProofHelper (seq {(p → r), (q → ¬r) ⊢ ¬(p ∧ q)})
 --from corsi tassi article
-#eval automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})
+#eval! automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})
 
 end multiSucc
