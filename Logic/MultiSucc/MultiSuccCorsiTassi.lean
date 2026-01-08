@@ -96,7 +96,7 @@ open Proof
 @[simp]
 def seqAtoms2seq (s : Seq4Proof) : Sequent :=
   match s with
-  | .seq4 atoms₁ forms₁ imps₁ usedImps₁  atoms₂ forms₂ imps₂ usedImps₂=>
+  | .seq4 atoms₁ forms₁ imps₁ usedImps₁  atoms₂ forms₂ imps₂ _=>
     have ant := Multiset.ofList ((atoms₁.map Form.atoms) ++ forms₁ ++ imps₁ ++ usedImps₁)
     have succ := Multiset.ofList ( (atoms₂.map Form.atoms) ++  forms₂ ++ imps₂)  -- usedImps₂ is to monitor R→ usage, not to display
     Sequent.seq ant succ
@@ -135,27 +135,33 @@ match toCheck with
 @[grind,simp]
 def complexity (xs : List Form): Nat := size_sum xs
 
-/- match xs with
-  | [] => 0
-  | x :: xs =>
-    match x with
-    | .bot | .atoms _ => complexity xs
-    | .and a b | .or a b | .imp a b=> 1 + complexity (a:: b:: xs)
-termination_by (size_sum xs, xs.length )
-decreasing_by
-all_goals simp; sorry -/
 
-@[grind,simp]
+/- @[grind,simp]
 def countImps (x : Form) : Nat :=
 match x with
   | .bot | .atoms _ =>  0
   | .and a b | .or a b => countImps a + countImps b
-  | .imp a b => 1 + countImps a + countImps b
+  | .imp a b => 1 + countImps a + countImps b -/
+@[simp, grind]
+def collectImps (x : Form) : List Form :=
+match x with
+  | .bot | .atoms _ =>  []
+  | .and a b | .or a b => collectImps a ++ collectImps b
+  | .imp a b => (.imp a b) :: collectImps a ++ collectImps b
+
+/- @[simp]
+lemma count_eq_collect_len (x : Form) :
+  countImps x = (collectImps x).length := by
+  induction x <;> simp [collectImps, countImps, List.length_append]
+  case and a b ih_a ih_b => rw [ih_a, ih_b]
+  case or a b ih_a ih_b => rw [ih_a, ih_b]
+  case imp a b ih_a ih_b => rw [ih_a, ih_b]; grind -/
 
 
 --weight function based on paper to prove termination :
 --(r,n) where r is nr of R→ occurences there has been in this branch and
 --n is the complexity of the set of forms that can be used as principle to any rule
+-- CAP= HULK
 @[grind]
 structure Weight (cap : ℕ) where
   r : ℕ
@@ -180,28 +186,55 @@ instance instWellFoundedRelation {cap : ℕ} : WellFoundedRelation (Weight cap) 
 
 end Weight
 
--- max nr of R→ is the ones already used+ imps in succ
 @[simp, grind]
-def Seq4Proof.cap (p : Seq4Proof) : ℕ :=
+def removeDuplicates: List Form → List Form
+| [] => []
+| x :: xs => if x ∈ xs then removeDuplicates xs
+             else x :: removeDuplicates xs
+
+-- max nr of R→ is the ones already used+ imps in succ
+-- carry the original list of all the imps with, use for proving that going up the proof tree will not add any imps, only get smaller
+-- collect allimplications, any imp form can be principal of R→ NLY ONCE
+@[simp, grind]
+def Seq4Proof.cap (p : Seq4Proof) : List Form:=
 match p with
 | .seq4 _  forms₁ imps₁ usedImps₁ _ forms₂ imps₂ usedImps₂  =>
-  (forms₁.map countImps).sum + (imps₁.map countImps).sum + usedImps₁.length + -- left side nested imps might move to right side
-   usedImps₂.length + (imps₂.map countImps).sum + (forms₂.map countImps).sum -- usedImps.length is usage of R→ already, only count top level imps. others nested too
+  /- ((forms₁.map countImps).sum + (imps₁.map countImps).sum + usedImps₁.length + -- left side nested imps might move to right side
+   usedImps₂.length + (imps₂.map countImps).sum + (forms₂.map countImps).sum, -- usedImps.length is usage of R→ already, only count top level imps. others nested too -/
+
+   ((forms₁.map collectImps).flatten ++ (imps₁.map collectImps).flatten ++ (usedImps₁.map collectImps).flatten /- usedImps₁  -/++ -- map usedImps1 as well to ease proof on fist rec call
+   usedImps₂ ++ (imps₂.map collectImps).flatten ++ (forms₂.map collectImps).flatten).eraseDups
 
 @[simp, grind]
-def Seq4Proof.r (p: Seq4Proof) : ℕ :=
-match p with
-| .seq4 _ _ _ _ _ _ _ usedImps₂  => usedImps₂.length -- occurences of R→ so far
+theorem cap_Nodup : (Seq4Proof.cap p).Nodup := sorry
 
-def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ) (hr : p.r ≤ cap ): Weight cap :=
-match _ : p with
-| .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ usedImps₂  =>
-    let cL := size_sum_increased forms₁--(countPrinciple forms₁ usedImps₁)-- forms in usedImps₁ can not be principle
-    let cR := size_sum_increased forms₂ --any imp on right side can be principle, bc either a fort is used or R→
-    let cImpL := size_sum imps₁
-    let cImpR := size_sum imps₂
-    let n := cL + cR + cImpL + cImpR
-    { r := p.r, n := n, hr := by simp_all }
+theorem eraseDup_Nodup (xs : List α) [BEq α]: (List.eraseDups xs).Nodup := sorry
+
+theorem eraseDup_Remove (first mid dup : List α)  [BEq α]:
+  List.eraseDups (first ++ dup ++ mid ++ dup) = List.eraseDups (first ++ dup ++ mid ) := sorry
+
+theorem eraseDup_len (first movable second : List α) [BEq α]: (first ++ movable ++ second).eraseDups.length = (movable ++ first ++ second).eraseDups.length := sorry
+
+@[simp, grind]
+def Seq4Proof.r (p: Seq4Proof) : List Form :=
+match p with
+| .seq4 _ _ _ _ _ _ _ usedImps₂  => usedImps₂ -- occurences of R→ so far
+
+def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ) (hcap : p.cap.length ≤ cap) (hr : (p.r).Nodup): Weight cap :=
+let r := p.r.length
+let n :=
+  match p with
+  | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ _  =>
+      let cL := size_sum_increased forms₁--(countPrinciple forms₁ usedImps₁)-- forms in usedImps₁ can not be principle
+      let cR := size_sum_increased forms₂ --any imp on right side can be principle, bc either a fort is used or R→
+      let cImpL := size_sum imps₁
+      let cImpR := size_sum imps₂
+      cL + cR + cImpL + cImpR
+let h : p.r.length ≤ p.cap.length := by
+  have Γ := cap_Nodup (p := p)
+  simp only [Seq4Proof.r, Seq4Proof.cap, List.append_assoc, ge_iff_le]; sorry
+let hr : p.r.length ≤ cap :=  Nat.le_trans h hcap
+{ r, n := n, hr }
 
 
 /- def f (cap : ℕ) (p : Seq4Proof) : ℕ :=
@@ -359,7 +392,7 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
    või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
  -/
 
-def automatedProof (s : Seq4Proof) (cap : ℕ) (hc : s.r ≤ cap := by grind): List (Proof (seqAtoms2seq s)) :=
+def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.length ≤ cap := by grind ) /- (hc : s.r ≤ cap := by grind) -/: List (Proof (seqAtoms2seq s)) :=
   match s with
   | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ usedImps₂ =>
     match forms₁ with
@@ -375,32 +408,38 @@ def automatedProof (s : Seq4Proof) (cap : ℕ) (hc : s.r ≤ cap := by grind): L
           | [] =>
             match imps₂ with
             | [] => []
-            | (.imp a b) :: imps /- | (.neg a) :: succForms -/ => by --METARULE 1
-              if (.imp a b) ∉ usedImps₂ then
-                have h₁ := automatedProof (.seq4 as [a] ( usedImps₁) [] [] [b] [] ((a ⊃ b)::usedImps₂)) cap (by simp; sorry) --move all usedimps back. TERMINATION PROBLEM
+            | (.imp a b) :: imps₂'  => by --METARULE 1
+              if (.imp a b) ∉ usedImps₂ then-- use this info
+               -- have needed : (usedImps₁.map collectImps).flatten ⊆ cap := sorry -- the cap gets bigger for this recursive call! for we are maping usedImps now bc they come back into use
+                have h₁ := automatedProof (.seq4 as [a] ( usedImps₁) [] [] [b] [] ((a ⊃ b)::usedImps₂)) cap (by simp at *; grind  ) --move all usedimps back. TERMINATION PROBLEM
                 simp at h₁
-                have h₂ := List.map (impr a b (as.map .atoms) ( usedImps₁) (bs.map .atoms) imps) h₁
+                have h₂ := List.map (impr a b (as.map .atoms) ( usedImps₁) (bs.map .atoms) imps₂') h₁
                 unfold seqAtoms2seq; simp
                 exact h₂
               else -- HERE can try a fortiori METARULE 2
-                have h₁ := automatedProof (.seq4 as [] [] usedImps₁ bs  [b]  imps usedImps₂) cap
+                have h₁ := automatedProof (.seq4 as [] [] usedImps₁ bs  [b]  imps₂' usedImps₂) cap (by simp? at * ; sorry)
                 simp at h₁
-                have h₂ := List.map (afort a b ((as.map .atoms) ++ usedImps₁) (bs.map .atoms) imps) h₁
+                have h₂ := List.map (afort a b ((as.map .atoms) ++ usedImps₁) (bs.map .atoms) imps₂') h₁
                 unfold seqAtoms2seq; simp only [List.append_nil]
                 exact h₂
             | _ => []
-          | (.imp a b) :: xs => by
-            have pair₁ := automatedProof (.seq4 as [] xs ((a ⊃ b) :: usedImps₁) bs [a] imps₂ usedImps₂ ) cap
-            have pair₂ := automatedProof (.seq4 as [b] xs (/- (.imp a b) :: -/ usedImps₁) bs [] imps₂ usedImps₂) cap-- by rule i cant keep copy of .imp a b in usedImps₁, do i need to?
-            simp at pair₁; simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at pair₂; --rw [← List.append_assoc [] imps₁ usedImps₁] at pair₂
-            have hΓ :  Multiset.ofList (List.map Form.atoms as ++ (xs ++ a.imp b :: usedImps₁)) =
-              Multiset.ofList (List.map .atoms as ++ a.imp b :: (xs ++ usedImps₁)) := by
+          | (.imp a b) :: imps₁' => by
+            have h_noDup := eraseDup_Remove (first := ((List.map collectImps imps₁').flatten ++ [(a ⊃ b)] ))
+              (mid := (collectImps b ++
+              ((List.map collectImps usedImps₁).flatten ++
+                (usedImps₂ ++ ((List.map collectImps imps₂).flatten))))  ) (dup := collectImps a)
+            have h_length := eraseDup_len (first := (a ⊃ b) :: (collectImps a) ++ (collectImps b ) ) (movable := ( (List.map collectImps imps₁').flatten)) (second := (List.map collectImps usedImps₁).flatten ++ (usedImps₂ ++ (List.map collectImps imps₂).flatten))
+            have pair₁ := automatedProof (.seq4 as [] imps₁' ((a ⊃ b) :: usedImps₁) bs [a] imps₂ usedImps₂ ) cap (by simp at *; rw [h_noDup]; clear h_noDup; rw[h_length] at hcap; clear h_length; exact hcap)-- every implicative formula can be principal form of R→ only once!!
+            have pair₂ := automatedProof (.seq4 as [b] imps₁' (usedImps₁) bs [] imps₂ usedImps₂) cap
+            simp at pair₁; simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at pair₂;
+            have hΓ :  Multiset.ofList (List.map Form.atoms as ++ (imps₁' ++ a.imp b :: usedImps₁)) =
+              Multiset.ofList (List.map .atoms as ++ a.imp b :: (imps₁' ++ usedImps₁)) := by
               simp only [ Multiset.coe_eq_coe]
               rw [ List.perm_append_left_iff, List.append_cons]
               simp only [List.append_assoc,List.cons_append, List.nil_append, List.perm_middle]
 
             rw [ hΓ] at pair₁
-            have h := List.map (impl a b (as.map .atoms) (xs ++ usedImps₁) (bs.map .atoms) imps₂).uncurry (getPairs pair₁ pair₂)
+            have h := List.map (impl a b (as.map .atoms) (imps₁' ++ usedImps₁) (bs.map .atoms) imps₂).uncurry (getPairs pair₁ pair₂)
             simp at h; simp; clear hΓ
             exact h
 
@@ -466,11 +505,11 @@ def automatedProof (s : Seq4Proof) (cap : ℕ) (hc : s.r ≤ cap := by grind): L
       simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at h₁
       rw [← List.append_assoc antForms imps₁ usedImps₁] at h₁; rw [← List.append_assoc] at h₁
       have h₂ := List.map (andl a b ((as.map .atoms)) (antForms++imps₁++ usedImps₁) ((bs.map .atoms)++forms₂++imps₂)) h₁
-      unfold seqAtoms2seq; simp only [List.append_nil]
+      unfold seqAtoms2seq
       simp only [← List.cons_append, ← List.append_assoc] at h₂
       exact h₂
     | (.or a b) :: antForms => by
-      have pair₁ := automatedProof (.seq4 as (a::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
+      have pair₁ := automatedProof (.seq4 as (a::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap (by simp at *; grind)
       have pair₂ := automatedProof (.seq4 as (b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
       simp at pair₁; rw [← List.append_assoc antForms imps₁ usedImps₁, ← List.append_assoc] at pair₁
       simp at pair₂; rw [← List.append_assoc antForms imps₁ usedImps₁, ← List.append_assoc] at pair₂
@@ -487,7 +526,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ) (hc : s.r ≤ cap := by grind): L
                 simp only [List.append_assoc,List.cons_append, List.nil_append, List.perm_middle]
       simp [hΓ] at h; exact h
 
-termination_by s.weight cap (by simp_all; /- grind -/)
+termination_by s.weight cap hcap
 decreasing_by
 all_goals simp [Seq4Proof.weight]; try grind
 
@@ -661,7 +700,8 @@ def seq2seq4 : Sequent → Seq4Proof
 
 def automatedProofHelper (s : Sequent) : Std.Format :=
   have seq4 := seq2seq4 s
-  have proofs := automatedProof seq4 seq4.cap
+  have h : (seq2seq4 s).r ≤ (seq2seq4 s).cap.length := by unfold seq2seq4; simp
+  have proofs := automatedProof (seq2seq4 s)  (seq2seq4 s).cap.length --stupid, no? it couldn't refer the h automatically when given seq4 instead of (seq2seq4 s)
   String.toFormat (listProofToString proofs)
 
 
