@@ -1,7 +1,23 @@
+import Mathlib.Tactic.Linarith.Frontend
+import Mathlib.Tactic.SimpRw
+import Mathlib.Data.Prod.Lex
+import Mathlib.Data.Multiset.Basic
+import Mathlib.Data.Multiset.UnionInter
+import Mathlib.Logic.Equiv.Defs
+import Mathlib.Data.List.Lemmas
+import Mathlib.Data.List.Dedup
+import Mathlib.Data.List.Lex
+import Mathlib.Data.Multiset.Sort
+import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Finset.Union
+import Mathlib.Data.Finset.Card
+
 import Logic.MultiSucc.Core
-import Logic.MultiSucc.Helper
-import Logic.MultiSucc.Display
 import Logic.MultiSucc.Syntax
+import Logic.MultiSucc.Helper
+
+import Logic.MultiSucc.Display
+
 
 namespace multiSucc
 open multiSucc

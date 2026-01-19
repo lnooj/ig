@@ -16,24 +16,6 @@ import Logic.MultiSucc.Core
 
 namespace multiSucc
 open multiSucc
-/-
-Needed for finding proofs for atomic formulas ([a, b, c ,a, d], Γ ⊢ a) <- this can be split up many ways (2 different a forms) so essentially different proofs
- -/
-def splitBy [DecidableEq α ] (xs : List α ) (a : α) : List (List α × List α) :=
-  match xs with
-  | [] => []
-  | x::xs =>
-    if x == a then
-      ([], xs) :: (splitBy xs a ).map (λ (fst, snd) => (x::fst, snd))
-    else
-      (splitBy xs a ).map (λ (fst, snd) => (x::fst, snd))
-
-#eval splitBy [1,2,1,2] 2
-
--- for any pair of returned list, fst+elem+snd = originaalne list
-theorem splitByCorrectness [DecidableEq α] (xs : List α) (a : α) :
-  ∀ pair ∈ (splitBy xs a), pair.1 ++ (a :: pair.2) = xs := by
-  sorry
 
 /-
 Atomic values get valued as one , not as 0, to help show termination for the atomic case in antecedent, same with bottom.

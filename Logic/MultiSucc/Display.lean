@@ -36,36 +36,38 @@ lemma Atom.ext {a b : Atom} (h : a.atom = b.atom) : a = b := by
   cases a; cases b
   simp_all
 
-theorem form_inj {f g : Form} (h : f.encode = g.encode) :
+theorem form_inj {f : Form} (h : f.encode = g.encode) :
   f = g := by
   match f, g with
   | .bot, .bot => rfl
+  | .bot, .atoms _ => simp only [Form.encode, List.cons.injEq, Nat.zero_ne_one, List.ne_cons_self,
+    and_self] at h
+  | .atoms _, .bot => simp only [Form.encode, List.cons.injEq, Nat.succ_ne_self, List.cons_ne_self,
+    and_self] at h
   | .atoms a, .atoms b =>
     simp only [Form.encode, List.cons.injEq, and_true, true_and] at h
     apply congrArg Form.atoms (Atom.ext h)
   | .and f g, .and f' g' =>
-    simp_all
+    simp_all only [Form.encode, List.cons_append, List.nil_append, List.cons.injEq, true_and,
+      Form.and.injEq]
     let ⟨h1,h2⟩ := h
     have := List.append_inj_right h2 h1
     have hn := List.append_inj_left' h2 (congrArg List.length this)
     exact ⟨form_inj hn, form_inj this⟩
   | .or f g, .or f' g' =>
-    simp_all
+    simp_all only [Form.encode, List.cons_append, List.nil_append, List.cons.injEq, true_and,
+      Form.or.injEq]
     let ⟨h1,h2⟩ := h
     have := List.append_inj_right h2 h1
     have hn := List.append_inj_left' h2 (congrArg List.length this)
     exact ⟨form_inj hn, form_inj this⟩
   | .imp f g, .imp f' g' =>
-    simp_all
+    simp_all only [Form.encode, List.cons_append, List.nil_append, List.cons.injEq, true_and,
+      Form.imp.injEq]
     let ⟨h1,h2⟩ := h
     have := List.append_inj_right h2 h1
     have hn := List.append_inj_left' h2 (congrArg List.length this)
     exact ⟨form_inj hn, form_inj this⟩
-  | _, _ => 
-    -- All mismatched constructor cases have different list prefixes and can't be equal
-    absurd h
-    cases f <;> cases g <;> 
-    (first | rfl | (simp only [Form.encode, List.cons.injEq]; omega))
 
 /-
   We can give a canonical ordering to `Form`s using our encodings
@@ -93,7 +95,7 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 -/
 
 #eval Multiset.sort example1 LE.le
-#eval! Multiset.sort example2 LE.le
+#eval Multiset.sort example2 LE.le
 
 instance : ToString Sequent where
   toString xseq :=
@@ -104,7 +106,7 @@ instance : ToString Sequent where
 instance : ToString Seq4Proof where
   toString seq4 :=
   match seq4 with
-  | .seq4 as forms₁ imps₁ _ bs forms₂ _ _ =>
+  | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ usedImps₂=>
   (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map formToString imps₁).toString
   ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString
 
