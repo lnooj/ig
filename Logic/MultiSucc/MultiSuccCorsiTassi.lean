@@ -22,29 +22,29 @@ open multiSucc
 Multi-succedent formulas Added a fortiori
  -/
 inductive Proof : Sequent → Type
-  -- ∀ x Γ, x ++ Γ ⊢ x
+  -- ∀ x Γ, x ++ Γ ⊢ x ++ Δ
   | ax :
-    ∀ (x : Form) (xs ys gs zs: List Form),
-      Proof (.seq ↑(xs ++ x :: ys) ↑(gs ++ x :: zs))
+    ∀ (x : Form) (xs ys: List Form),
+      Proof (.seq ↑(x :: xs) ↑(x :: ys))
   -- ∀ Δ Γ, (⊥, Γ ⊢ Δ)
   | botl :
-    ∀ (xs ys gs : List Form),
-      Proof (.seq ↑(xs ++ ⊥ :: ys) ↑gs)
+    ∀ (xs ys : List Form),
+      Proof (.seq ↑(⊥ :: xs) ↑ys)
   | botr :
-    ∀ (xs ys gs : List Form),
-      Proof (.seq ↑xs ↑(ys ++ gs)) →
-      Proof (.seq ↑xs ↑(ys ++ ⊥ :: gs))
+    ∀ (xs ys : List Form),
+      Proof (.seq ↑xs ↑ys) →
+      Proof (.seq ↑xs ↑(⊥ :: ys))
   -- ∀ a b Γ Δ, (Γ, a, b ⊢ Δ) → (Γ, a ∧ b ⊢ Δ)
   | andl :
-    ∀ (a b : Form) (xs ys gs: List Form),
-      Proof (.seq ↑(xs ++ a :: b :: ys) ↑gs) →
-      Proof (.seq ↑(xs ++ (a ∧∧ b) :: ys) ↑gs)
+    ∀ (a b : Form) (xs ys: List Form),
+      Proof (.seq ↑(a :: b :: xs) ↑ys) →
+      Proof (.seq ↑((a ∧∧ b) :: xs) ↑ys)
   -- ∀ a b Γ Δ, (Γ ⊢ a, Δ) → (Γ ⊢ b, Δ) → (Γ ⊢ a ∧ b, Δ)
   | andr :
-    ∀ (a b : Form) (xs ys gs: List Form),
-      Proof (.seq ↑xs ↑(ys ++ a::gs)) →
-      Proof (.seq ↑xs ↑(ys ++ b::gs)) →
-      Proof (.seq ↑xs ↑(ys ++ (a ∧∧ b)::gs))
+    ∀ (a b : Form) (xs ys: List Form),
+      Proof (.seq ↑xs ↑(a :: ys)) →
+      Proof (.seq ↑xs ↑(b :: ys)) →
+      Proof (.seq ↑xs ↑((a ∧∧ b) :: ys))
   -- ∀ a b Γ Δ, (a, Γ ⊢ Δ) → (b, Γ ⊢ Δ) → (a ∨ b, Γ ⊢ Δ)
   | orl :
     ∀ (a b : Form) (xs ys gs : List Form),
@@ -264,24 +264,10 @@ theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
       have ⟨h₁, h₂⟩ := ih xatom xatom_in
       exact ⟨h₁, List.Mem.tail _ h₂⟩
 
-lemma atoms_inj: Function.Injective Form.atoms := by
-  intro a b h
-  cases h
-  rfl
 
-lemma erase_multiset_append
-    {l : List Atom} (ctx : List Form) {x : Atom} (hx : x ∈ l) :
-    Multiset.ofList (List.map Form.atoms (l.erase x) ++ Form.atoms x :: ctx) =
-    Multiset.ofList (List.map Form.atoms l ++ ctx) := by
-  rw [Multiset.coe_eq_coe,  ← List.singleton_append, ← List.append_assoc, List.perm_append_right_iff ctx]
-
-  have base : l.Perm (x :: l.erase x) := by simp [List.perm_cons_erase hx]
-  rw [← List.map_perm_map_iff atoms_inj] at base
-  simp only [List.map_cons] at base
-  have something:= List.perm_append_singleton (Form.atoms x) (List.map Form.atoms (l.erase x))
-  rw [List.perm_comm]
-  rw [List.perm_comm] at something
-  exact (List.Perm.trans base something )
+def Proof.castSeqList (x : List (Proof (Sequent.seq (Multiset.ofList a₁) (Multiset.ofList b₁))))
+    (ha : Multiset.ofList a₁ = Multiset.ofList a₂) (hb : Multiset.ofList b₁ = Multiset.ofList b₂) :
+    List (Proof (Sequent.seq (Multiset.ofList a₂) (Multiset.ofList b₂))) := by rw [ha, hb] at x; exact x
 
 
 /- current: findIntersection returns just intersection, wo. duplicates.  -/
@@ -296,22 +282,18 @@ def findAtomicProofs (xs: List Atom)  (as : List Atom)
   | [] => []
   | x :: xs' => by
     -- remove intersection atom x from atomic lists, as in rule
-    have proof := ax (.atoms x) (List.map .atoms (as.erase x)) (imps₁ ++ usedImps₁) (List.map .atoms (bs.erase x)) imps₂
-    simp
+    have proof := ax (.atoms x) (List.map .atoms (as.erase x) ++ imps₁ ++ usedImps₁) (List.map .atoms (bs.erase x) ++ imps₂)
+    simp only [seqAtoms2seq, List.append_nil, List.append_assoc]
 
     have h : x ∈ (findIntersection as bs) := by simp [hxs]
 
-    have corr_as : x ∈ as := (fin_corr x h).1
-    have Γ₁ :
-        Multiset.ofList (List.map .atoms (as.erase x) ++ .atoms x :: (imps₁ ++ usedImps₁)) =
-        Multiset.ofList (List.map .atoms as ++ (imps₁ ++ usedImps₁)) :=
-        erase_multiset_append (imps₁ ++ usedImps₁)  corr_as
+    have Γ₁ : Multiset.ofList (.atoms x :: (List.map .atoms (as.erase x) ++ imps₁ ++ usedImps₁)) =
+              Multiset.ofList (List.map .atoms as ++ (imps₁ ++ usedImps₁)) :=
+              by simp only [Multiset.coe_eq_coe]; grind
 
-    have corr_bs : x ∈ bs := (fin_corr x h).2
-    have Γ₂ : Multiset.ofList (List.map Form.atoms (bs.erase x) ++ Form.atoms x :: imps₂) =
-               Multiset.ofList (List.map Form.atoms bs ++ imps₂) := by
-              have := erase_multiset_append imps₂ corr_bs
-              simp only [List.append_nil] at this; exact this
+    have Γ₂ : Multiset.ofList ( Form.atoms x :: (List.map Form.atoms (bs.erase x) ++ imps₂)) =
+              Multiset.ofList (List.map Form.atoms bs ++ imps₂) :=
+              by simp only [Multiset.coe_eq_coe]; grind
 
     rw [Γ₁, Γ₂] at proof
     have new_hxs : ∀ x ∈ xs', x ∈ findIntersection as bs := by
@@ -404,21 +386,18 @@ def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.card ≤ cap := by
         exact h
       | ⊥ :: succForms =>  by --botr rule, .bot is ignored
         have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms imps₂ usedImps₂) cap
-        simp at h; rw [← List.append_assoc] at h
-        have rule := List.map (botr ((as.map .atoms)++imps₁++usedImps₁) (bs.map .atoms) (succForms ++ imps₂)) h
-        unfold seqAtoms2seq; simp
-        simp at rule
-        exact rule
-
+        simp only [seqAtoms2seq, List.append_nil] at h
+        have rule := List.map (botr ((as.map .atoms)++imps₁++usedImps₁) (bs.map .atoms ++ succForms ++ imps₂)) h
+        simp only [seqAtoms2seq, List.append_nil]
+        apply Proof.castSeqList rule
+        . simp only [List.append_assoc]
+        . simp only [List.append_assoc, Multiset.coe_eq_coe]; grind
       | (.and a b) :: succForms => by
         have pair1 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (a :: succForms) imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind [Finset.union_comm, Finset.union_assoc] )
         have pair2 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (b :: succForms) imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind [Finset.union_comm, Finset.union_assoc] )
-        unfold seqAtoms2seq at pair1; simp at pair1; rw [← List.append_assoc] at pair1
-        unfold seqAtoms2seq at pair2; simp at pair2; rw [← List.append_assoc] at pair2
-        have h := List.map (andr a b ((as.map .atoms)++ imps₁ ++ usedImps₁) (bs.map .atoms) (succForms++imps₂)).uncurry (getPairs pair1 pair2)
-        unfold seqAtoms2seq; simp
-        simp at h
-        exact h
+        simp only [seqAtoms2seq, List.append_nil] at pair1 pair2 ⊢
+        have h := List.map (andr a b ((as.map .atoms) ++ imps₁ ++ usedImps₁) (bs.map .atoms ++ succForms ++ imps₂)).uncurry (getPairs (Proof.castSeqList pair1 (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)) (Proof.castSeqList pair2 (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)))
+        apply Proof.castSeqList h (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
       | (.or a b) :: succForms => by
         have h₁ := automatedProof (.seq4 as [] imps₁ usedImps₁ bs  (a :: b :: succForms) imps₂ usedImps₂) cap
         simp at h₁; rw [← List.singleton_append, ← List.append_assoc, ← List.append_assoc] at h₁
@@ -441,18 +420,16 @@ def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.card ≤ cap := by
       have h := automatedProof (.seq4 (as ++ [a]) antForms imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
       simp at h; simp; exact h
     | .bot :: antForms => by
-      have h:= [botl (as.map .atoms) (antForms++imps₁++usedImps₁) ((bs.map .atoms)++forms₂++imps₂)]
-      simp only [List.append_assoc] at h
-      simp
-      exact h
+      have h:= [botl (as.map .atoms ++ antForms ++ imps₁ ++ usedImps₁) ((bs.map .atoms) ++ forms₂ ++ imps₂)]
+      simp only [seqAtoms2seq, List.append_assoc, List.cons_append]
+      apply Proof.castSeqList h
+      . simp only [List.append_assoc, Multiset.coe_eq_coe]; grind
+      . simp only [List.append_assoc]
     | (.and a b) :: antForms => by
-      have h₁ := automatedProof (.seq4 as (a::b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
-      simp only [seqAtoms2seq, List.append_assoc, List.cons_append] at h₁
-      rw [← List.append_assoc antForms imps₁ usedImps₁] at h₁; rw [← List.append_assoc] at h₁
-      have h₂ := List.map (andl a b ((as.map .atoms)) (antForms++imps₁++ usedImps₁) ((bs.map .atoms)++forms₂++imps₂)) h₁
-      unfold seqAtoms2seq
-      simp only [← List.cons_append, ← List.append_assoc] at h₂
-      exact h₂
+      have h₁ := automatedProof (.seq4 as (a :: b :: antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
+      simp only [seqAtoms2seq] at h₁; simp only [seqAtoms2seq]
+      have h₂ := List.map (andl a b ((as.map .atoms) ++ antForms ++ imps₁ ++ usedImps₁) ((bs.map .atoms) ++ forms₂ ++ imps₂)) (Proof.castSeqList h₁ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
+      apply Proof.castSeqList h₂ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl)
     | (.or a b) :: antForms => by
       have pair₁ := automatedProof (.seq4 as (a::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
       have pair₂ := automatedProof (.seq4 as (b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
@@ -586,23 +563,23 @@ def listToString (xs : List Form) : String :=
   String.intercalate ", " (xs.map formToString)
 
 def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String
-| .ax x xs ys gs zs  =>
-  indent indentLvl s!"AX: {formToString x}, {listToString xs}, {listToString ys} ⊢ {formToString x}, {listToString gs}, {listToString zs} "
-| .botl xs ys gs =>
-  indent indentLvl s!"⊥L: ⊥, {listToString xs}, {listToString ys} ⊢ {listToString gs}"
-| .botr xs ys gs proof =>
+| .ax x xs ys =>
+  indent indentLvl s!"AX: {formToString x}, {listToString xs} ⊢ {formToString x}, {listToString ys}"
+| .botl xs ys =>
+  indent indentLvl s!"⊥L: ⊥, {listToString xs} ⊢ {listToString ys}"
+| .botr xs ys proof =>
   let premise := proofToString (indentLvl + 1) proof
   let ruleLine :=
-  s!"⊥R: {listToString xs} ⊢ ⊥, {listToString ys}, {listToString gs}"
+  s!"⊥R: {listToString xs} ⊢ ⊥, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .andl a b xs ys gs proof =>
+| .andl a b xs ys proof =>
   let premise := proofToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L: ({formToString a} ∧ {formToString b}), {listToString xs}, {listToString ys} ⊢ {listToString gs}"
+  let ruleLine := s!"∧L: ({formToString a} ∧ {formToString b}), {listToString xs} ⊢ {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .andr a b xs ys gs proof₁ proof₂=>
+| .andr a b xs ys proof₁ proof₂=>
   let left := proofToString  (indentLvl + 1) proof₁
   let right := proofToString (indentLvl + 1) proof₂
-  let ruleLine := s!"∧R: {listToString xs} ⊢ {formToString a} ∧ {formToString b}, {listToString ys}, {listToString gs}"
+  let ruleLine := s!"∧R: {listToString xs} ⊢ {formToString a} ∧ {formToString b}, {listToString ys}"
   s!"{left}\n{right}\n{indent indentLvl (horizontalLine (ruleLine.length))}\n{indent indentLvl ruleLine}"
 | .orl a b xs ys gs proof₁ proof₂=>
   let left := proofToString  (indentLvl + 1) proof₁
