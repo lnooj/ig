@@ -1,6 +1,7 @@
 import Mathlib.Data.Multiset.Basic
 
-namespace multiSucc
+namespace singleSucc
+
 
 structure Atom where
   atom : Nat
@@ -25,19 +26,19 @@ def Form.neg (a : Form) : Form :=  a ⊃ ⊥
 
 
 /- Using Multisets to not worry about order of forms -/
--- [f1, f2] ⊢ [g1, g2]
+-- [f1, f2] ⊢ f
 inductive Sequent
-  | seq : Multiset Form → Multiset Form → Sequent
---deriving Repr
+  | seq : Multiset Form → Form → Sequent
+
 
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
-[x, y], [f1, f2], usable[imp1, imp2], nonusable[imp1, imp2] ⊢ [x, y], [g1, g2], usable[imp1, imp2], used[imp1, imp2]
+Atomic formulas and implications are seperated.
  -/
+-- [x, y], [f1, f2] [imps] ⊢ f
 inductive Seq4Proof
-  | seq4 : List Atom → List Form → List Form → List Form  → List Atom → List Form → List Form → List Form → Seq4Proof
---deriving Repr
+  | seq4 : List Atom → List Form → List Form → Form → Seq4Proof
 
 
-end multiSucc
+end singleSucc

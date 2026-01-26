@@ -15,7 +15,6 @@ import Mathlib.Data.Finset.Card
 import Logic.MultiSucc.Core
 import Logic.MultiSucc.Syntax
 import Logic.MultiSucc.Helper
-
 import Logic.MultiSucc.Display
 
 
@@ -149,7 +148,7 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
    või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
  -/
 
-def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.card ≤ cap := by simp at *; grind ) /- (hc : s.r ≤ cap := by grind) -/: List (Proof (seqAtoms2seq s)) :=
+def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.card ≤ cap := by simp at *; grind ) : List (Proof (seqAtoms2seq s)) :=
   match s with
   | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ usedImps₂ =>
     match forms₁ with
