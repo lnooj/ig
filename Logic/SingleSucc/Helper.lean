@@ -31,13 +31,15 @@ def Form.weight : Form → Nat
   | .or p q => 1 + p.weight + q.weight
   | .imp p q => 1 + p.weight + q.weight
 
-@[simp]
-def Form.weightIncreased : Form → Nat
-  | .bot => 2
-  | .atoms _ => 2
-  | .and p q => 3 + p.weight + q.weight
-  | .or p q => 2 + p.weight + q.weight
-  | .imp p q => 2 + p.weight + q.weight
+@[grind,simp]
+def weight_sum : List Form → Nat
+  | [] => 0
+  | f :: fs => 2 * f.weight + weight_sum fs
+
+@[grind,simp]
+def weight_sum_increased : List Form → Nat
+  | [] => 0
+  | f :: fs => 2 * f.weight + 1 + weight_sum_increased fs
 
 @[simp]
 instance : LT Form := ⟨fun b a => b.weight < a.weight⟩
@@ -57,16 +59,14 @@ def Sequent.size : Sequent → Multiset Nat
   | .seq Δ G => ((Δ).map Form.weight) + {G.weight}
 
 /-
-def seq2seq4 : Sequent → Seq4Proof
-| .seq Δ G =>
-  have antecedent := Multiset.sort Δ LE.le
-  Seq4Proof.seq4 [] antecedent [] G
-
-def Sequent.size (s : Sequent) :  Multiset Nat :=
-  let seq4 := seq2seq4 s
-  match seq4 with
-  | .seq4 as forms imps goal => ((as.map .atoms).map Form.weight) + (forms.map Form.weightIncreased) + (imps.map Form.weight) + {goal.weight}
+This is used as the second argument of a lexicographic order,
+to show termination for the 2 cases where we move imps to imps list and atom to atoms list.
+So the original forms list carries more wight than the distributed lists.
  -/
+def Seq4Proof.size (s : Seq4Proof) : Nat :=
+  match s with
+  | .seq4 _ forms imps goal =>  (weight_sum_increased forms) + (weight_sum imps) + goal.weight
+
 /-
 The Multiset Ordering. Based on Form.weight multisets
 equivalent seqLE → Multiset.lt?
@@ -78,12 +78,6 @@ This has already been defined in Mathlib.Data.Multiset.DershowitzManna
               (Δ'.size = (Δ.size - X) ∪ Y ) ∧
               (∀ y ∈ Y, ∃ x ∈ X, x > y) -/
 
-
-
-/- instance sequentWellFoundedRelation : WellFoundedRelation Sequent where
-  rel Δ' Δ := Multiset.IsDershowitzMannaLT Δ'.size Δ.size
-  wf := (invImage Sequent.size (Multiset.instWellFoundedIsDershowitzMannaLT (α := Nat))).wf
- -/
 instance sequentWellFoundedRelation : WellFoundedRelation Sequent where
   rel Δ' Δ := Multiset.IsDershowitzMannaLT Δ'.size Δ.size
   wf := (invImage Sequent.size (Multiset.instWellFoundedIsDershowitzMannaLT (α := Nat))).wf

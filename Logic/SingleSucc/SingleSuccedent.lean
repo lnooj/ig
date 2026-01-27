@@ -209,24 +209,24 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
       simp only [seqAtoms2seq] at h ⊢
       have impr := List.map (impr a b ((as.map .atoms) ++ forms ++ imps)) (Proof.castSeqList h )
       exact impr
-termination_by (seqAtoms2seq s).size
+termination_by ((seqAtoms2seq s).size, s.size)
 decreasing_by
-all_goals simp only [seqAtoms2seq, Multiset.IsDershowitzMannaLT, Sequent.size]
-. simp only [Form.weight]
+all_goals simp only [seqAtoms2seq, Sequent.size]
+. apply Prod.Lex.left; simp only [Form.weight]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, {b.weight}, {(Form.atoms a ⊃ b).weight}, ?_, ?_, ?_, ?_⟩
   . simp only [Form.weight, Nat.reduceAdd, Multiset.empty_eq_zero, ne_eq, Multiset.singleton_ne_zero, not_false_eq_true]
   . simp only [X]; rw [List.append_assoc, List.singleton_append]; apply sequent_size_add_singleton
   . simp only [X, List.append_nil]; apply sequent_size_add_singleton
   . simp
-. simp only [Form.weight, List.append_nil]
+. apply Prod.Lex.left; simp only [Form.weight, List.append_nil]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, { (c ⊃ (d ⊃ b)).weight }, { ((c ∧∧ d) ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]; apply sequent_size_add_singleton
   . simp only [X]; apply sequent_size_add_singleton
   . intro y hy; simp at hy; simp [Form.weight, hy]; grind
-. simp only [Form.weight, List.append_nil]
+. apply Prod.Lex.left; simp only [Form.weight, List.append_nil]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, Multiset.ofList ([(c ⊃ b).weight] ++ [(d ⊃ b).weight]) , { ((c ∨∨ d) ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
@@ -236,7 +236,7 @@ all_goals simp only [seqAtoms2seq, Multiset.IsDershowitzMannaLT, Sequent.size]
     rw [← Multiset.coe_add [(c ⊃ b).weight] _]; simp only [Multiset.coe_singleton]; grind
   . simp only [X]; apply sequent_size_add_singleton
   . intro y hy; simp at hy; simp [Form.weight]; grind
-. simp only [List.append_nil]
+. apply Prod.Lex.left; simp only [List.append_nil]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps')
   refine ⟨X, Multiset.ofList ([(d ⊃ b).weight] ++ [(c ⊃ d).weight]), Multiset.ofList ([((c ⊃ d) ⊃ b).weight] ++ [(Form.atoms g).weight]), ?_, ?_, ?_, ?_⟩
   . simp
@@ -246,22 +246,26 @@ all_goals simp only [seqAtoms2seq, Multiset.IsDershowitzMannaLT, Sequent.size]
   . simp only [X]; rw [ sequent_size_add_singleton, ← Multiset.coe_add [((c ⊃ d) ⊃ b).weight] _ ]
     simp only [Multiset.coe_singleton]; grind
   . intro y hy; simp at hy; simp [Form.weight]; grind
-. simp only [Form.weight, List.append_nil]
+. apply Prod.Lex.left; simp only [Form.weight, List.append_nil]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, { b.weight }, { ((c ⊃ d) ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]; rw [List.append_assoc, List.singleton_append]; apply sequent_size_add_singleton
   . simp only [X]; apply sequent_size_add_singleton
   . simp
-. simp only [Form.weight, List.append_nil]
+. apply Prod.Lex.left; simp only [Form.weight, List.append_nil]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, ∅ , { (⊥ ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]; simp
   . simp only [X]; apply sequent_size_add_singleton
   . intro y hy; simp at hy
-. sorry --ATOM REPLACEMENT
-. simp only [Form.weight]
+. simp only [Form.weight] --ATOM REPLACEMENT
+  have hM : (Multiset.map Form.weight ↑(List.map Form.atoms (a :: as) ++ forms' ++ imps) + {1}) =
+            (Multiset.map Form.weight ↑(List.map Form.atoms as ++ Form.atoms a :: forms' ++ imps) + {1}) := by
+          simp only [Multiset.map_coe, ← Multiset.coe_singleton, Multiset.coe_add _ [1], Multiset.coe_eq_coe]; grind
+  rw [hM]; apply Prod.Lex.right; simp only [Seq4Proof.size]; grind
+. apply Prod.Lex.left; simp only [Form.weight]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms' ++ imps) + {1}
   refine ⟨X, Multiset.ofList ([a.weight] ++ [b.weight]) , {(a ∧∧ b).weight}, ?_, ?_, ?_, ?_⟩
   . simp
@@ -270,46 +274,50 @@ all_goals simp only [seqAtoms2seq, Multiset.IsDershowitzMannaLT, Sequent.size]
     rw [sequent_size_add_singleton as (forms' ++ imps) b 1, ← Multiset.coe_add [a.weight]]; simp only [Multiset.coe_singleton]; grind
   . simp only [X]; rw [List.append_assoc, List.append_assoc]; apply sequent_size_add_singleton as (forms' ++ imps) (a ∧∧ b)
   . simp; grind
-. simp only [Form.weight]
+. apply Prod.Lex.left; simp only [Form.weight]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms' ++ imps) + {1}
   refine ⟨X, { a.weight }, { (a ∨∨ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]; rw [List.append_assoc, List.append_assoc]; apply sequent_size_add_singleton as (forms' ++ imps)
   . simp only [X]; rw [List.append_assoc, List.append_assoc]; apply sequent_size_add_singleton as (forms' ++ imps) (a ∨∨ b)
   . simp; grind
-. simp only [Form.weight]
+. apply Prod.Lex.left; simp only [Form.weight]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms' ++ imps) + {1}
   refine ⟨X, { b.weight }, { (a ∨∨ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]; rw [List.append_assoc, List.append_assoc]; apply sequent_size_add_singleton as (forms' ++ imps)
   . simp only [X]; rw [List.append_assoc, List.append_assoc]; apply sequent_size_add_singleton as (forms' ++ imps) (a ∨∨ b)
   . simp
-. sorry --MOVING IMP TO DIFFERENT PLACE, SEQ STAYS SAME
-. set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. simp only [Form.weight] --MOVING IMP TO DIFFERENT PLACE, SEQ STAYS SAME
+  have hM : (Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms' ++ (a ⊃ b) :: imps) + {1}) =
+            (Multiset.map Form.weight ↑(List.map Form.atoms as ++ (a ⊃ b) :: forms' ++ imps) + {1}) := by
+          simp only [Multiset.map_coe, ← Multiset.coe_singleton, Multiset.coe_add _ [1], Multiset.coe_eq_coe]; grind
+  rw [hM]; apply Prod.Lex.right; simp only [Seq4Proof.size]; grind
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
   refine ⟨X, { a.weight }, {(a ∧∧ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp; grind
-. set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
   refine ⟨X, { b.weight }, {(a ∧∧ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp
-. set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
   refine ⟨X, { a.weight }, {(a ∨∨ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp; grind
-. set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
   refine ⟨X, { b.weight }, {(a ∨∨ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp
-. set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
   refine ⟨X,  Multiset.ofList ([a.weight] ++ [b.weight]) , {(a ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X];
@@ -405,5 +413,5 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
 #eval! automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})
 
-
+#print axioms automatedProofHelper
 end singleSucc
