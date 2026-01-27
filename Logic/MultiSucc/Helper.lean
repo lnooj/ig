@@ -147,7 +147,16 @@ def findIntersection : List Atom → List Atom → List Atom
 
 #eval findIntersection [Atom.mk 1] [Atom.mk 1, Atom.mk 2, Atom.mk 1]
 
---TODO theorem: when findIntersection empty, no overlapping atoms in either lists
+
+theorem mem_findIntersection_iff (x : Atom) :
+  x ∈ findIntersection xs ys ↔ x ∈ xs ∧ x ∈ ys := by
+  induction ys with
+  | nil => simp [findIntersection]
+  | cons y ys ih =>
+    unfold findIntersection
+    by_cases hxy : y ∈ xs
+    · grind
+    . grind
 
 theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
   ∀ x ∈ (findIntersection xs ys), x ∈ xs ∧ x ∈ ys :=
@@ -177,5 +186,19 @@ theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
       have ih := findIntersCorr xs ys'
       have ⟨h₁, h₂⟩ := ih xatom xatom_in
       exact ⟨h₁, List.Mem.tail _ h₂⟩
+
+--TODO theorem: when findIntersection empty, no overlapping atoms in either lists
+theorem noIntersection (xs : List Atom) (ys : List Atom) :
+  (findIntersection xs ys) = [] → (∀ x ∈ xs, x ∉ ys) ∧ (∀ y ∈ ys, y ∉ xs ):=
+  λ h => by
+  constructor
+  . intro x hx hxy
+    have : x ∈ findIntersection xs ys :=
+      (mem_findIntersection_iff x).2 ⟨hx, hxy⟩
+    simp [h] at this
+  . intro y hy hyx
+    have : y ∈ findIntersection xs ys :=
+      (mem_findIntersection_iff y).2 ⟨hyx, hy⟩
+    simp [h] at this
 
 end multiSucc
