@@ -31,6 +31,10 @@ def Form.weight : Form → Nat
   | .or p q => 1 + p.weight + q.weight
   | .imp p q => 1 + p.weight + q.weight
 
+@[simp]
+instance : LT Form := ⟨fun b a => b.weight < a.weight⟩
+
+
 @[grind,simp]
 def weight_sum : List Form → Nat
   | [] => 0
@@ -41,8 +45,6 @@ def weight_sum_increased : List Form → Nat
   | [] => 0
   | f :: fs => 2 * f.weight + 1 + weight_sum_increased fs
 
-@[simp]
-instance : LT Form := ⟨fun b a => b.weight < a.weight⟩
 
 --Prove fell-foundedness of weight
 instance formWeightWellFoundedRelation : WellFoundedRelation Form where
@@ -81,7 +83,7 @@ This has already been defined in Mathlib.Data.Multiset.DershowitzManna
 instance sequentWellFoundedRelation : WellFoundedRelation Sequent where
   rel Δ' Δ := Multiset.IsDershowitzMannaLT Δ'.size Δ.size
   wf := (invImage Sequent.size (Multiset.instWellFoundedIsDershowitzMannaLT (α := Nat))).wf
-
+#print axioms sequentWellFoundedRelation
 /-
 needed to find all possible pairings (of proofs) for cases like or, and ...
  -/

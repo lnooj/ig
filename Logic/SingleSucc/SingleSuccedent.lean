@@ -12,11 +12,8 @@ open singleSucc
 
 
 /-
-imp₁ imp₂ imp₃ imp₄ were initially defined to help with termination and looping prevention (paper by Roy Dyckhoff),
-but introduces other complexities...
+imp₁ imp₂ imp₃ imp₄ (imp₀) are defined to help with termination and looping prevention (paper by Roy Dyckhoff)
 
-Right now copies of formulas in the proof tree are left out (in impl and negl) to make sure automatedProof terminates.
-reason for keeping copies- we may need to use them again to find our proof- completeness
  -/
 inductive Proof : Sequent → Type
   -- ∀ x Γ, x ++ Γ ⊢ x
@@ -28,10 +25,11 @@ inductive Proof : Sequent → Type
   | botl :
     ∀ (x : Form) (xs : List Form),
       Proof (.seq ↑( ⊥ :: xs) x)
-    -- ∀ Γ, ( ⊥, Γ ⊢ ⊥)-- NOT CORRECT RULE?
+/-     -- ∀ Γ, ( ⊥, Γ ⊢ ⊥)
   | botr :
-    ∀ (xs : List Form) (h : ⊥ ∈ xs),
-      Proof (.seq ↑xs ⊥)
+    ∀ (xs : List Form),
+      (h : ⊥ ∈ xs) →
+      Proof (.seq ↑xs ⊥) -/
   -- ∀ a b c Γ, (Γ, a, b ⊢ c) → (Γ, a ∧ b ⊢ c)
   | andl :
     ∀ (a b g : Form) (xs : List Form),
@@ -68,7 +66,8 @@ inductive Proof : Sequent → Type
   -- a is atomic
   -- ∀ a b g Γ, (a, b, Γ ⊢ g) → (a → b, a, Γ ⊢ g)
   | impl₁ :
-    ∀ (a : Atom) (b g : Form) (xs : List Form) (h : (.atoms a) ∈ xs), --HERE ALSO NEED PROOF OF a ∈ xs ???
+    ∀ (a : Atom) (b g : Form) (xs : List Form), --HERE ALSO NEED PROOF OF a ∈ xs
+      (h : (.atoms a) ∈ xs) →
       Proof (.seq ↑(/- (.atoms a) :: -/ b :: xs) g) →
       Proof (.seq ↑(((.atoms a) ⊃ b) :: /- (.atoms a) ::  -/xs) g)
   -- implications left side is and operation
@@ -99,10 +98,11 @@ open Proof
 
 
 @[simp]
-def seqAtoms2seq (s : Seq4Proof) : Sequent :=
-  match s with
-  | .seq4 atoms forms imps g =>
-    Sequent.seq (Multiset.ofList ((atoms.map Form.atoms) ++ forms ++ imps)) g
+def Seq4Proof.toSeq : Seq4Proof → Sequent
+| .seq4 atoms forms imps g => Sequent.seq (Multiset.ofList ((atoms.map Form.atoms) ++ forms ++ imps)) g
+
+def Sequent.toSeq4 : Sequent → Seq4Proof
+| .seq Δ G => Seq4Proof.seq4 [] (Multiset.sort Δ LE.le) [] G
 
 def Proof.castSeqList (x : List (Proof (Sequent.seq (Multiset.ofList a₁) g))) (h : Multiset.ofList a₁ = Multiset.ofList a₂ := by simp only [Multiset.coe_eq_coe]; grind) :
   List (Proof (Sequent.seq (Multiset.ofList a₂) g)) := by rw [h] at x; exact x
@@ -122,14 +122,14 @@ lemma sequent_size_add_singleton (as : List Atom) (imps : List Form) (b : Form) 
 lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 
-def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
+def automatedProof (s : Seq4Proof) : List (Proof s.toSeq) :=
   match s with
   | .seq4 as forms imps g =>
     match g with
     | (.atoms g) =>  -- check if we have axiom
       if h : g ∈ as then
         by -- find atomicproofs
-        simp only [seqAtoms2seq]
+        simp only [Seq4Proof.toSeq]
         exact dbg_trace "axiom rule applied"; [ax (.atoms g) ((as.map .atoms) ++ forms ++ imps) (by grind)]
 
       else -- no axiom, continue opening up left side
@@ -142,29 +142,29 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
             | .atoms a =>
               if h : a ∈ as then by
                 have h := automatedProof (.seq4 as [b] imps' (.atoms g))
-                simp only [seqAtoms2seq, List.append_nil] at h ⊢
+                simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
                 have proofs := List.map (impl₁ a b (.atoms g) ((as.map .atoms) ++ imps') (by grind)) (Proof.castSeqList h )
                 apply Proof.castSeqList proofs
               else dbg_trace "empty"; []
             | .and c d => by
               have h := automatedProof (.seq4 as [] ((c ⊃ (d ⊃ b))::imps') (.atoms g)) --put them straight into imps list
-              simp only [seqAtoms2seq, List.append_nil] at h ⊢
+              simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
               have proofs := List.map (impl₂ c d b (.atoms g) ((as.map .atoms) ++ imps')) (Proof.castSeqList h )
               apply Proof.castSeqList proofs
             | .or c d => by
               have h := automatedProof (.seq4 as [] ((c ⊃ b) :: (d ⊃ b) ::imps') (.atoms g)) --put them straight into imps list
-              simp only [seqAtoms2seq, List.append_nil] at h ⊢
+              simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
               have proofs := List.map (impl₃ c d b (.atoms g) ((as.map .atoms) ++ imps')) (Proof.castSeqList h )
               apply Proof.castSeqList proofs
             | .imp c d => by
               have h₁ := automatedProof (.seq4 as [] ((d ⊃ b) ::imps') (c ⊃ d)) --put them straight into imps list
               have h₂ := automatedProof (.seq4 as [b] imps' (.atoms g))
-              simp only [seqAtoms2seq, List.append_nil] at h₁ h₂ ⊢
+              simp only [Seq4Proof.toSeq, List.append_nil] at h₁ h₂ ⊢
               have proofs := List.map (impl₄ c d b (.atoms g) ((as.map .atoms) ++ imps')).uncurry (getPairs (Proof.castSeqList h₁ ) (Proof.castSeqList h₂ ))
               apply Proof.castSeqList proofs
             | .bot => by
               have h := automatedProof (.seq4 as [] imps' (.atoms g))
-              simp only [seqAtoms2seq, List.append_nil] at h ⊢
+              simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
               have proofs := List.map (impl₀ b (.atoms g) ((as.map .atoms) ++ imps')) h
               apply Proof.castSeqList proofs
           | _ =>  dbg_trace "empty";[]
@@ -172,17 +172,17 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
           Proof.castSeqList (automatedProof (.seq4 (a :: as) forms' imps (.atoms g)))
         | ⊥ :: forms' => by
           have proof := botl (.atoms g) ((as.map .atoms) ++ forms' ++ imps)
-          simp only [seqAtoms2seq]
+          simp only [Seq4Proof.toSeq]
           apply Proof.castSeqList [proof]
         | (.and a b) :: forms' => by
           have h := automatedProof (.seq4 as (a :: b :: forms') imps (.atoms g))
-          simp only [seqAtoms2seq] at h ⊢
+          simp only [Seq4Proof.toSeq] at h ⊢
           have proofs := List.map (andl a b (.atoms g) ((as.map .atoms) ++ forms' ++ imps)) (Proof.castSeqList h)
           apply Proof.castSeqList proofs
         | (.or a b) :: forms' => by
           have h₁ := automatedProof (.seq4 as (a :: forms') imps (.atoms g))
           have h₂ := automatedProof (.seq4 as (b :: forms') imps (.atoms g))
-          simp only [seqAtoms2seq] at h₁ h₂ ⊢
+          simp only [Seq4Proof.toSeq] at h₁ h₂ ⊢
           have proofs := List.map (orl a b (.atoms g) ((as.map .atoms) ++ forms' ++ imps)).uncurry (getPairs (Proof.castSeqList h₁) (Proof.castSeqList h₂))
           apply Proof.castSeqList proofs
         | (.imp a b) :: forms' => --just put into imps
@@ -192,26 +192,26 @@ def automatedProof (s : Seq4Proof) : List (Proof (seqAtoms2seq s)) :=
     | (.and a b) => by
       have h₁ := automatedProof (.seq4 as forms imps a)
       have h₂ := automatedProof (.seq4 as forms imps b)
-      simp only [seqAtoms2seq] at h₁ h₂ ⊢
+      simp only [Seq4Proof.toSeq] at h₁ h₂ ⊢
       have proofs := List.map (andr a b ((as.map .atoms) ++ forms ++ imps)).uncurry (getPairs h₁ h₂)
       exact dbg_trace "AND rule applied"; proofs
 
     | (.or a b) => by
       have h₁ := automatedProof (.seq4 as forms imps a)
-      simp only [seqAtoms2seq] at h₁ ⊢
+      simp only [Seq4Proof.toSeq] at h₁ ⊢
       have orr₁ := List.map (orr₁ a b ((as.map .atoms) ++ forms ++ imps)) h₁
       have h₂ := automatedProof (.seq4 as forms imps b)
-      simp only [seqAtoms2seq] at h₂
+      simp only [Seq4Proof.toSeq] at h₂
       have orr₂ := List.map (orr₂ a b ((as.map .atoms) ++ forms ++ imps)) h₂
       exact dbg_trace "OR rule applied"; (orr₁ ++ orr₂)
     | (.imp a b) => by
       have h := automatedProof (.seq4 as (a :: forms) imps b)
-      simp only [seqAtoms2seq] at h ⊢
+      simp only [Seq4Proof.toSeq] at h ⊢
       have impr := List.map (impr a b ((as.map .atoms) ++ forms ++ imps)) (Proof.castSeqList h )
       exact impr
-termination_by ((seqAtoms2seq s).size, s.size)
+termination_by ((Seq4Proof.toSeq s).size, s.size)
 decreasing_by
-all_goals simp only [seqAtoms2seq, Sequent.size]
+all_goals simp only [Seq4Proof.toSeq, Sequent.size]
 . apply Prod.Lex.left; simp only [Form.weight]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, {b.weight}, {(Form.atoms a ⊃ b).weight}, ?_, ?_, ?_, ?_⟩
@@ -330,20 +330,11 @@ all_goals simp only [seqAtoms2seq, Sequent.size]
 
 
 
-
-def seq2seq4 : Sequent → Seq4Proof
-| .seq Δ G =>
-  have antecedent := Multiset.sort Δ LE.le
-  Seq4Proof.seq4 [] antecedent [] G
-
-
 def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String
-| .ax x xs h =>
+| .ax x xs _ =>
   indent indentLvl s!"AX: {listToString xs} ⊢ {formToString x}"
 | .botl x xs =>
   indent indentLvl s!"⊥L: ⊥, {listToString xs} ⊢ {formToString x}"
-| .botr xs h =>
-  indent indentLvl s!"⊥R: {listToString xs} ⊢ ⊥"
 | .andl a b g xs proof =>
   let premise := proofToString (indentLvl + 1) proof
   let ruleLine := s!"∧L: ({formToString a} ∧ {formToString b}), {listToString xs} ⊢ {formToString g}"
@@ -366,7 +357,7 @@ def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String
   let premise  := proofToString (indentLvl + 1) proof
   let ruleLine := s!"→L₀: ({formToString ⊥} → {formToString b}), {listToString xs}⊢ {formToString g}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .impl₁ a b g xs h proof =>
+| .impl₁ a b g xs _ proof =>
   let premise  := proofToString (indentLvl + 1) proof
   let ruleLine := s!"→L₁: ({formToString (.atoms a)} → {formToString b}), {listToString xs}⊢ {formToString g}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
@@ -398,11 +389,12 @@ instance : ToString (List (Proof xseq)) where
 
 
 def automatedProofHelper (s : Sequent) : Std.Format :=
-  have seq4 := seq2seq4 s
+  have seq4 := Sequent.toSeq4 s
   have proofs := automatedProof seq4
   dbg_trace "{proofs.length}"; String.toFormat (listProofToString proofs)
 
-#eval! automatedProofHelper (seq {(p → q), p ⊢ q})
+
+#eval automatedProofHelper (seq {(p → q), p ⊢ q})
 #eval! automatedProofHelper (seq {(p ∨ q), ¬p ⊢ q})
 #eval! automatedProofHelper (seq {p ⊢ (q ∨ p)})
 #eval! automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
@@ -412,6 +404,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 #eval! automatedProofHelper (seq {⊢ ¬¬ (¬p ∨ p)})
 
 #eval! automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})
+
 
 #print axioms automatedProofHelper
 end singleSucc

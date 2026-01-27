@@ -28,15 +28,6 @@ def sizeOf_Form : Form → Nat
   | .or p q => 1 + sizeOf_Form p + sizeOf_Form q
   | .imp p q => 1 + sizeOf_Form p + sizeOf_Form q
 
-@[simp, grind]
-def sizeOf_Form_increased : Form → Nat
-  | ⊥ => 2
-  | .atoms _ => 2
-  | .and p q => 2 + sizeOf_Form_increased p + sizeOf_Form_increased q
-  | .or p q => 2 + sizeOf_Form_increased p + sizeOf_Form_increased q
-  | .imp p q => 2 + sizeOf_Form_increased p + sizeOf_Form_increased q
-
-
 --complexity of set of principle formulas: nr of logical symbols occuring in them
 @[grind,simp]
 def size_sum : List Form → Nat
