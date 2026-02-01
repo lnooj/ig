@@ -18,7 +18,7 @@ instance : SizeOf (OrderDual ℕ) where
 
 #eval Lean.versionString
 
-@[simp]
+/- @[simp]
 theorem Seq4Proof.sizeOf_lt_iff (a b : Seq4Proof) :
       Prod.Lex (fun a₁ a₂ => a₂ < a₁) (fun x1 x2 => x2 < x1) b.weight a.weight
     ↔ a.r > b.r ∨ a.r = b.r ∧ a.n < b.n := by
@@ -33,4 +33,4 @@ def f (p : Seq4Proof) : ℕ :=
 termination_by p.weight
 decreasing_by
   simp
-  omega
+  omega -/

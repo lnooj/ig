@@ -1,7 +1,7 @@
 import Mathlib.Data.Multiset.Sort
 import Mathlib.Data.List.Lex
 
-import Logic.SingleSucc.Core
+import Logic.SingleSuccDyckhoff.Core
 
 namespace singleSucc
 open singleSucc

@@ -1,8 +1,9 @@
 import Lean.PrettyPrinter.Delaborator
-import Logic.SingleSucc.Core
 import Mathlib.Data.Multiset.Basic
 
-open singleSucc
+import Logic.MultiSuccCorsiTassi.Core
+
+open multiSucc
 
 declare_syntax_cat atom
 declare_syntax_cat form
@@ -15,7 +16,7 @@ syntax "mult" "{" multiset "}" : term
 syntax "seq " "{" sequent "}" : term
 
 syntax form,* : multiset
-syntax multiset " ⊢ " form : sequent
+syntax multiset " ⊢ " multiset : sequent
 
 syntax "~" term:max : form
 
@@ -38,8 +39,8 @@ macro_rules
     | "r" => `(Atom.mk 3)
     | s       => Lean.Macro.throwError s!"Unknown atom name: {s}"
 | `(mult { $[$fs:form],* }) => `(Multiset.ofList [ $[form {$fs}],* ])
-| `(seq { $Γ:multiset ⊢ $G:form }) =>
-      `(Sequent.seq (mult {$Γ}) (form {$G}))
+| `(seq { $Γ:multiset ⊢ $Δ:multiset }) =>
+      `(Sequent.seq (mult {$Γ}) (mult {$Δ}))
 | `(form {($a → $b)} ) => `(Form.imp form {$a} form {$b})
 | `(form {($a ∧ $b)} ) => `(Form.and form {$a} form {$b})
 | `(form {($a ∨ $b)} ) => `(Form.or form {$a} form {$b})
@@ -49,4 +50,4 @@ macro_rules
 
 #check seq {p,( p → q) ⊢ r}
 #check form {(p → q)}
-#check seq { ⊢ r}
+#check seq { ⊢ r, p}

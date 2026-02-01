@@ -1,10 +1,10 @@
 import Mathlib.Tactic.Linarith.Frontend
 import Mathlib.Tactic.SimpRw
 
-import Logic.SingleSucc.Core
-import Logic.SingleSucc.Helper
-import Logic.SingleSucc.Display
-import Logic.SingleSucc.Syntax
+import Logic.SingleSuccDyckhoff.Core
+import Logic.SingleSuccDyckhoff.Helper
+import Logic.SingleSuccDyckhoff.Display
+import Logic.SingleSuccDyckhoff.Syntax
 
 namespace singleSucc
 open singleSucc
@@ -119,6 +119,10 @@ lemma sequent_size_add_singleton (as : List Atom) (imps : List Form) (b : Form) 
     rw [← Multiset.coe_add, ← Multiset.coe_add, Multiset.add_comm (Multiset.ofList [b.weight])];
     rw [←Multiset.coe_add, Multiset.coe_singleton]; grind
 
+/- lemma sequent_reduce {first last : List Form}:
+  (Multiset.map Form.weight (↑(first ++ [b] ++ last) + {n})).IsDershowitzMannaLT
+  (Multiset.map Form.weight (↑(first ++ [] ++ (Form.atoms a ⊃ b) :: last) + {n}))
+ -/
 lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 
@@ -212,14 +216,16 @@ def automatedProof (s : Seq4Proof) : List (Proof s.toSeq) :=
 termination_by ((Seq4Proof.toSeq s).size, s.size)
 decreasing_by
 all_goals simp only [Seq4Proof.toSeq, Sequent.size]
-. apply Prod.Lex.left; simp only [Form.weight]
+. apply Prod.Lex.left
+  simp only [Form.weight]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, {b.weight}, {(Form.atoms a ⊃ b).weight}, ?_, ?_, ?_, ?_⟩
   . simp only [Form.weight, Nat.reduceAdd, Multiset.empty_eq_zero, ne_eq, Multiset.singleton_ne_zero, not_false_eq_true]
   . simp only [X]; rw [List.append_assoc, List.singleton_append]; apply sequent_size_add_singleton
   . simp only [X, List.append_nil]; apply sequent_size_add_singleton
   . simp
-. apply Prod.Lex.left; simp only [Form.weight, List.append_nil]
+. apply Prod.Lex.left
+  simp only [Form.weight, List.append_nil]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, { (c ⊃ (d ⊃ b)).weight }, { ((c ∧∧ d) ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp

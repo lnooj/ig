@@ -1,7 +1,7 @@
 import Mathlib.Data.Multiset.Sort
 import Mathlib.Data.List.Lex
 
-import Logic.MultiSucc.Core
+import Logic.MultiSuccCorsiTassi.Core
 
 namespace multiSucc
 open multiSucc
@@ -106,9 +106,9 @@ instance : ToString Sequent where
 instance : ToString Seq4Proof where
   toString seq4 :=
   match seq4 with
-  | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ usedImps₂=>
+  | .seq4 as forms₁ imps₁ _  bs forms₂ imps₂ _=>
   (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map formToString imps₁).toString
-  ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString
+  ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString ++ (List.map formToString imps₂).toString
 
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))

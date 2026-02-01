@@ -12,7 +12,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Union
 import Mathlib.Data.Finset.Card
 
-import Logic.MultiSucc.Core
+import Logic.MultiSuccCorsiTassi.Core
 
 namespace multiSucc
 open multiSucc

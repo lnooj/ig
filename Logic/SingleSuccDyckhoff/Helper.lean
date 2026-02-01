@@ -14,8 +14,8 @@ import Mathlib.Data.Finset.Card
 import Mathlib.Data.Multiset.DershowitzManna
 
 
-import Logic.SingleSucc.Core
-import Logic.SingleSucc.Display
+import Logic.SingleSuccDyckhoff.Core
+import Logic.SingleSuccDyckhoff.Display
 
 namespace singleSucc
 open singleSucc

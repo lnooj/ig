@@ -12,10 +12,10 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Union
 import Mathlib.Data.Finset.Card
 
-import Logic.MultiSucc.Core
-import Logic.MultiSucc.Syntax
-import Logic.MultiSucc.Helper
-import Logic.MultiSucc.Display
+import Logic.MultiSuccCorsiTassi.Core
+import Logic.MultiSuccCorsiTassi.Syntax
+import Logic.MultiSuccCorsiTassi.Helper
+import Logic.MultiSuccCorsiTassi.Display
 
 
 namespace multiSucc

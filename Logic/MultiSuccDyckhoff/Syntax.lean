@@ -1,6 +1,7 @@
 import Lean.PrettyPrinter.Delaborator
-import Logic.MultiSucc.Core
 import Mathlib.Data.Multiset.Basic
+
+import Logic.MultiSuccDyckhoff.Core
 
 open multiSucc
 
