@@ -67,7 +67,7 @@ So the original forms list carries more wight than the distributed lists.
  -/
 def Seq4Proof.size (s : Seq4Proof) : Nat :=
   match s with
-  | .seq4 _ forms imps goal =>  (weight_sum_increased forms) + (weight_sum imps) + goal.weight
+  | .seq4 _ forms imps _ goal =>  (weight_sum_increased forms) + (weight_sum imps) + goal.weight
 
 /-
 The Multiset Ordering. Based on Form.weight multisets

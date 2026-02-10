@@ -83,8 +83,8 @@ instance : ToString Sequent where
 instance : ToString Seq4Proof where
   toString seq4 :=
   match seq4 with
-  | .seq4 as forms₁ imps₁ bs forms₂ imps₂ =>
-  (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map formToString imps₁).toString
+  | .seq4 as forms₁ imps₁ aimps bs forms₂ imps₂ =>
+  (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map formToString imps₁).toString ++ (List.map formToString aimps).toString
   ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString ++ (List.map formToString imps₂).toString
 
 def indent (n : Nat) (s : String) : String :=

@@ -68,8 +68,8 @@ inductive Proof : Sequent → Type
   | impl₁ :
     ∀ (a : Atom) (b g : Form) (xs : List Form), --HERE ALSO NEED PROOF OF a ∈ xs
       (h : (.atoms a) ∈ xs) →
-      Proof (.seq ↑(/- (.atoms a) :: -/ b :: xs) g) →
-      Proof (.seq ↑(((.atoms a) ⊃ b) :: /- (.atoms a) ::  -/xs) g)
+      Proof (.seq ↑(b :: xs) g) →
+      Proof (.seq ↑(((.atoms a) ⊃ b) :: xs) g)
   -- implications left side is and operation
   -- ∀ c d b g Γ, (c ⊃ (d ⊃ b), Γ ⊢ g) → ((c ∧∧ d) ⊃ b, Γ ⊢ g)
   | impl₂ :
@@ -99,10 +99,10 @@ open Proof
 
 @[simp]
 def Seq4Proof.toSeq : Seq4Proof → Sequent
-| .seq4 atoms forms imps g => Sequent.seq (Multiset.ofList ((atoms.map Form.atoms) ++ forms ++ imps)) g
+| .seq4 atoms forms imps aimps g => Sequent.seq (Multiset.ofList ((atoms.map Form.atoms) ++ forms ++ imps ++ aimps)) g
 
 def Sequent.toSeq4 : Sequent → Seq4Proof
-| .seq Δ G => Seq4Proof.seq4 [] (Multiset.sort Δ LE.le) [] G
+| .seq Δ G => Seq4Proof.seq4 [] (Multiset.sort Δ LE.le) [] [] G
 
 def Proof.castSeqList (x : List (Proof (Sequent.seq (Multiset.ofList a₁) g))) (h : Multiset.ofList a₁ = Multiset.ofList a₂ := by simp only [Multiset.coe_eq_coe]; grind) :
   List (Proof (Sequent.seq (Multiset.ofList a₂) g)) := by rw [h] at x; exact x
@@ -119,119 +119,143 @@ lemma sequent_size_add_singleton (as : List Atom) (imps : List Form) (b : Form) 
     rw [← Multiset.coe_add, ← Multiset.coe_add, Multiset.add_comm (Multiset.ofList [b.weight])];
     rw [←Multiset.coe_add, Multiset.coe_singleton]; grind
 
-/- lemma sequent_reduce {first last : List Form}:
-  (Multiset.map Form.weight (↑(first ++ [b] ++ last) + {n})).IsDershowitzMannaLT
-  (Multiset.map Form.weight (↑(first ++ [] ++ (Form.atoms a ⊃ b) :: last) + {n}))
- -/
+--dont know how to show this
+lemma dershowits_simp {first last a b : List Form} {g : Form}:
+  (Multiset.map Form.weight (↑(first ++ a ++ last) ) + {g.weight}).IsDershowitzMannaLT
+  (Multiset.map Form.weight (↑(first ++ b ++ last)) + {g.weight})  =
+    (Multiset.map Form.weight a).IsDershowitzMannaLT (Multiset.map Form.weight b):= by sorry
+
+
+def firstImpPremisePresent (imps : List Form) (atoms : List Atom) : Option Form :=
+  match imps with
+  | [] => (none)
+  | (Form.imp (.atoms a) b) :: imps' =>
+      if a ∈ atoms then
+        (some (.atoms a ⊃ b))
+      else
+        firstImpPremisePresent imps' atoms
+  | _ :: imps' =>
+      firstImpPremisePresent imps' atoms
+
+lemma firstImpPremisePresent_sound :
+  firstImpPremisePresent imps atoms = (some f) →
+  ∃ a b,
+    f = (Form.imp (.atoms a) b) ∧
+    f ∈ imps ∧
+    a ∈ atoms := by
+  fun_induction firstImpPremisePresent <;> grind
+
+
 lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 
 def automatedProof (s : Seq4Proof) : List (Proof s.toSeq) :=
   match s with
-  | .seq4 as forms imps g =>
+  | .seq4 as forms imps aimps g =>
     match g with
-    | (.atoms g) =>  -- check if we have axiom
+    | .atoms g /- | ⊥ -/ =>  -- check if we have axiom
       if h : g ∈ as then
         by -- find atomicproofs
         simp only [Seq4Proof.toSeq]
-        exact dbg_trace "axiom rule applied"; [ax (.atoms g) ((as.map .atoms) ++ forms ++ imps) (by grind)]
+        exact dbg_trace "axiom rule applied"; [ax (.atoms g) ((as.map .atoms) ++ forms ++ imps ++ aimps) (by grind)]
 
       else -- no axiom, continue opening up left side
         match forms with
         | [] =>  --only imps remain
           match imps with
-          | [] => dbg_trace "empty imps {as}, goal: {g}"; []
+          | [] =>
+            match impO : firstImpPremisePresent aimps as with
+            | none => []
+            | some (.imp (.atoms a ) b) => by
+              have sound := firstImpPremisePresent_sound impO
+              set rest := aimps.erase (Form.imp (.atoms a) b)
+
+              have premise := automatedProof (.seq4 as [b] [] rest (.atoms g))
+              simp only [Seq4Proof.toSeq, List.append_nil] at premise ⊢
+
+              have proof := List.map ((impl₁ a b (.atoms g) (as.map .atoms ++ rest) ) (by grind)) (Proof.castSeqList premise )
+              apply Proof.castSeqList proof
+            | some _ => []
           | (.imp a b ):: imps' => -- apply four imp rules
             match a with
-            | .atoms a =>
-              if h : a ∈ as then by
-                have h := automatedProof (.seq4 as [b] imps' (.atoms g))
-                simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
-                have proofs := List.map (impl₁ a b (.atoms g) ((as.map .atoms) ++ imps') (by grind)) (Proof.castSeqList h )
-                apply Proof.castSeqList proofs
-              else dbg_trace "empty"; []
+            | .atoms a => -- put to aimps
+              Proof.castSeqList (automatedProof (.seq4 as [] imps' ((.imp (.atoms a) b):: aimps) (.atoms g))) (by simp; grind)
             | .and c d => by
-              have h := automatedProof (.seq4 as [] ((c ⊃ (d ⊃ b))::imps') (.atoms g)) --put them straight into imps list
+              have h := automatedProof (.seq4 as [] ((c ⊃ (d ⊃ b))::imps') (aimps) (.atoms g)) --put them straight into imps list
               simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
-              have proofs := List.map (impl₂ c d b (.atoms g) ((as.map .atoms) ++ imps')) (Proof.castSeqList h )
+              have proofs := List.map (impl₂ c d b (.atoms g) ((as.map .atoms) ++ imps' ++ aimps)) (Proof.castSeqList h )
               apply Proof.castSeqList proofs
             | .or c d => by
-              have h := automatedProof (.seq4 as [] ((c ⊃ b) :: (d ⊃ b) ::imps') (.atoms g)) --put them straight into imps list
+              have h := automatedProof (.seq4 as [] ((c ⊃ b) :: (d ⊃ b) :: imps') (aimps) (.atoms g)) --put them straight into imps list
               simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
-              have proofs := List.map (impl₃ c d b (.atoms g) ((as.map .atoms) ++ imps')) (Proof.castSeqList h )
+              have proofs := List.map (impl₃ c d b (.atoms g) ((as.map .atoms) ++ imps' ++ aimps)) (Proof.castSeqList h )
               apply Proof.castSeqList proofs
             | .imp c d => by
-              have h₁ := automatedProof (.seq4 as [] ((d ⊃ b) ::imps') (c ⊃ d)) --put them straight into imps list
-              have h₂ := automatedProof (.seq4 as [b] imps' (.atoms g))
+              have h₁ := automatedProof (.seq4 as [] ((d ⊃ b) :: imps') (aimps) (c ⊃ d)) --put them straight into imps list
+              have h₂ := automatedProof (.seq4 as [b] imps' aimps (.atoms g))
               simp only [Seq4Proof.toSeq, List.append_nil] at h₁ h₂ ⊢
-              have proofs := List.map (impl₄ c d b (.atoms g) ((as.map .atoms) ++ imps')).uncurry (getPairs (Proof.castSeqList h₁ ) (Proof.castSeqList h₂ ))
+              have proofs := List.map (impl₄ c d b (.atoms g) ((as.map .atoms) ++ imps' ++ aimps)).uncurry (getPairs (Proof.castSeqList h₁ ) (Proof.castSeqList h₂ ))
               apply Proof.castSeqList proofs
             | .bot => by
-              have h := automatedProof (.seq4 as [] imps' (.atoms g))
+              have h := automatedProof (.seq4 as [] imps' aimps (.atoms g))
               simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
-              have proofs := List.map (impl₀ b (.atoms g) ((as.map .atoms) ++ imps')) h
+              have proofs := List.map (impl₀ b (.atoms g) ((as.map .atoms) ++ imps' ++ aimps)) h
               apply Proof.castSeqList proofs
           | _ =>  dbg_trace "empty";[]
         | (.atoms a) :: forms' =>  --just put into atoms
-          Proof.castSeqList (automatedProof (.seq4 (a :: as) forms' imps (.atoms g)))
+          Proof.castSeqList (automatedProof (.seq4 (a :: as) forms' imps aimps (.atoms g)))
         | ⊥ :: forms' => by
-          have proof := botl (.atoms g) ((as.map .atoms) ++ forms' ++ imps)
+          have proof := botl (.atoms g) ((as.map .atoms) ++ forms' ++ imps ++ aimps)
           simp only [Seq4Proof.toSeq]
           apply Proof.castSeqList [proof]
         | (.and a b) :: forms' => by
-          have h := automatedProof (.seq4 as (a :: b :: forms') imps (.atoms g))
+          have h := automatedProof (.seq4 as (a :: b :: forms') imps aimps (.atoms g))
           simp only [Seq4Proof.toSeq] at h ⊢
-          have proofs := List.map (andl a b (.atoms g) ((as.map .atoms) ++ forms' ++ imps)) (Proof.castSeqList h)
+          have proofs := List.map (andl a b (.atoms g) ((as.map .atoms) ++ forms' ++ imps ++ aimps)) (Proof.castSeqList h)
           apply Proof.castSeqList proofs
         | (.or a b) :: forms' => by
-          have h₁ := automatedProof (.seq4 as (a :: forms') imps (.atoms g))
-          have h₂ := automatedProof (.seq4 as (b :: forms') imps (.atoms g))
+          have h₁ := automatedProof (.seq4 as (a :: forms') imps aimps (.atoms g))
+          have h₂ := automatedProof (.seq4 as (b :: forms') imps aimps (.atoms g))
           simp only [Seq4Proof.toSeq] at h₁ h₂ ⊢
-          have proofs := List.map (orl a b (.atoms g) ((as.map .atoms) ++ forms' ++ imps)).uncurry (getPairs (Proof.castSeqList h₁) (Proof.castSeqList h₂))
+          have proofs := List.map (orl a b (.atoms g) ((as.map .atoms) ++ forms' ++ imps ++ aimps)).uncurry (getPairs (Proof.castSeqList h₁) (Proof.castSeqList h₂))
           apply Proof.castSeqList proofs
         | (.imp a b) :: forms' => --just put into imps
-          Proof.castSeqList (automatedProof (.seq4 as forms' ((a ⊃ b) :: imps) (.atoms g)))
-
-    | ⊥ => dbg_trace "empty"; [] -- is it??? ???????????????????
+          Proof.castSeqList (automatedProof (.seq4 as forms' ((a ⊃ b) :: imps) aimps (.atoms g)))
+    | ⊥ => sorry
     | (.and a b) => by
-      have h₁ := automatedProof (.seq4 as forms imps a)
-      have h₂ := automatedProof (.seq4 as forms imps b)
+      have h₁ := automatedProof (.seq4 as forms imps aimps a)
+      have h₂ := automatedProof (.seq4 as forms imps aimps b)
       simp only [Seq4Proof.toSeq] at h₁ h₂ ⊢
-      have proofs := List.map (andr a b ((as.map .atoms) ++ forms ++ imps)).uncurry (getPairs h₁ h₂)
+      have proofs := List.map (andr a b ((as.map .atoms) ++ forms ++ imps ++ aimps)).uncurry (getPairs h₁ h₂)
       exact dbg_trace "AND rule applied"; proofs
-
     | (.or a b) => by
-      have h₁ := automatedProof (.seq4 as forms imps a)
+      have h₁ := automatedProof (.seq4 as forms imps aimps a)
       simp only [Seq4Proof.toSeq] at h₁ ⊢
-      have orr₁ := List.map (orr₁ a b ((as.map .atoms) ++ forms ++ imps)) h₁
-      have h₂ := automatedProof (.seq4 as forms imps b)
+      have orr₁ := List.map (orr₁ a b ((as.map .atoms) ++ forms ++ imps ++ aimps)) h₁
+      have h₂ := automatedProof (.seq4 as forms imps aimps b)
       simp only [Seq4Proof.toSeq] at h₂
-      have orr₂ := List.map (orr₂ a b ((as.map .atoms) ++ forms ++ imps)) h₂
+      have orr₂ := List.map (orr₂ a b ((as.map .atoms) ++ forms ++ imps ++ aimps)) h₂
       exact dbg_trace "OR rule applied"; (orr₁ ++ orr₂)
     | (.imp a b) => by
-      have h := automatedProof (.seq4 as (a :: forms) imps b)
+      have h := automatedProof (.seq4 as (a :: forms) imps aimps b)
       simp only [Seq4Proof.toSeq] at h ⊢
-      have impr := List.map (impr a b ((as.map .atoms) ++ forms ++ imps)) (Proof.castSeqList h )
+      have impr := List.map (impr a b ((as.map .atoms) ++ forms ++ imps ++ aimps)) (Proof.castSeqList h )
       exact impr
 termination_by ((Seq4Proof.toSeq s).size, s.size)
 decreasing_by
 all_goals simp only [Seq4Proof.toSeq, Sequent.size]
-. apply Prod.Lex.left
-  simp only [Form.weight]
-  set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
-  refine ⟨X, {b.weight}, {(Form.atoms a ⊃ b).weight}, ?_, ?_, ?_, ?_⟩
-  . simp only [Form.weight, Nat.reduceAdd, Multiset.empty_eq_zero, ne_eq, Multiset.singleton_ne_zero, not_false_eq_true]
-  . simp only [X]; rw [List.append_assoc, List.singleton_append]; apply sequent_size_add_singleton
-  . simp only [X, List.append_nil]; apply sequent_size_add_singleton
-  . simp
-. apply Prod.Lex.left
-  simp only [Form.weight, List.append_nil]
-  set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
-  refine ⟨X, { (c ⊃ (d ⊃ b)).weight }, { ((c ∧∧ d) ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
-  . simp
-  . simp only [X]; apply sequent_size_add_singleton
-  . simp only [X]; apply sequent_size_add_singleton
-  . intro y hy; simp at hy; simp [Form.weight, hy]; grind
+. sorry
+. apply Prod.Lex.left; --prod.Lex.Right
+  have h := dershowits_simp (first:= List.map Form.atoms as) (last := imps') (a := [b]) (b := [(Form.atoms a )⊃ b]) (g := Form.atoms g)
+  simp at *; simp only [h]; clear h; simp only [Multiset.IsDershowitzMannaLT]
+  refine ⟨0, {b.weight}, {2 + b.weight}, ?_, ?_, ?_, ?_⟩
+  all_goals simp
+. apply Prod.Lex.left;
+  have h := dershowits_simp (first:= List.map Form.atoms as) (last := imps') (a := [ (c ⊃ (d ⊃ b))]) (b := [((c ∧∧ d) ⊃ b)]) (g := Form.atoms g)
+  simp at *; simp only [h]; clear h; simp only [Multiset.IsDershowitzMannaLT]
+  refine ⟨0, {1 + c.weight + (1 + d.weight + b.weight) }, {1 + (2 + c.weight + d.weight) + b.weight}, ?_, ?_, ?_, ?_⟩
+  all_goals simp
+  . grind
 . apply Prod.Lex.left; simp only [Form.weight, List.append_nil]
   set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ imps') + {1}
   refine ⟨X, Multiset.ofList ([(c ⊃ b).weight] ++ [(d ⊃ b).weight]) , { ((c ∨∨ d) ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
@@ -299,31 +323,31 @@ all_goals simp only [Seq4Proof.toSeq, Sequent.size]
             (Multiset.map Form.weight ↑(List.map Form.atoms as ++ (a ⊃ b) :: forms' ++ imps) + {1}) := by
           simp only [Multiset.map_coe, ← Multiset.coe_singleton, Multiset.coe_add _ [1], Multiset.coe_eq_coe]; grind
   rw [hM]; apply Prod.Lex.right; simp only [Seq4Proof.size]; grind
-. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps ++ aimps)
   refine ⟨X, { a.weight }, {(a ∧∧ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp; grind
-. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps ++ aimps)
   refine ⟨X, { b.weight }, {(a ∧∧ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp
-. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps ++ aimps)
   refine ⟨X, { a.weight }, {(a ∨∨ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp; grind
-. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps ++ aimps)
   refine ⟨X, { b.weight }, {(a ∨∨ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X]
   . simp only [X]
   . simp
-. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps)
+. apply Prod.Lex.left; set X : Multiset Nat :=  Multiset.map Form.weight ↑(List.map Form.atoms as ++ forms ++ imps ++ aimps)
   refine ⟨X,  Multiset.ofList ([a.weight] ++ [b.weight]) , {(a ⊃ b).weight }, ?_, ?_, ?_, ?_⟩
   . simp
   . simp only [X];

@@ -87,7 +87,7 @@ match x with
 def Seq4Proof.cap (p : Seq4Proof) : Finset Form:=
 match p with
 | .seq4 _  forms₁ imps₁ usedImps₁ _ forms₂ imps₂ usedImps₂  =>
-   ((forms₁.toFinset.biUnion collectImps) ∪ (imps₁.toFinset.biUnion collectImps) ∪ (usedImps₁.toFinset.biUnion collectImps) /- usedImps₁  -/∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
+   ((forms₁.toFinset.biUnion collectImps) ∪ (imps₁.toFinset.biUnion collectImps) ∪ (usedImps₁.toFinset.biUnion collectImps) ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
    usedImps₂.toFinset ∪ (imps₂.toFinset.biUnion collectImps) ∪ (forms₂.toFinset.biUnion collectImps))
 
 /-- occurences of R→ rule so far, stored in usedImps₂  -/
@@ -117,7 +117,6 @@ let n :=
 let h : p.r.card ≤ p.cap.card := by
   simp only [Seq4Proof.cap, Finset.union_assoc, Seq4Proof.r];
   apply (Finset.card_le_card ?_); grind
-
 let hr : p.r.card ≤ cap :=  Nat.le_trans h hcap
 { r, n := n, hr }
 

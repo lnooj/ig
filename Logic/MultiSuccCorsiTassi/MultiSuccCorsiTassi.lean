@@ -66,7 +66,7 @@ inductive Proof : Sequent → Type
   | impr :
     ∀ (a b : Form) (xs ys: List Form),
       Proof (.seq ↑(a :: xs) {b}) →
-      Proof (.seq ↑(xs) ↑((a ⊃ b) :: ys)) --succ järjestus
+      Proof (.seq ↑(xs) ↑((a ⊃ b) :: ys))
   -- ∀ a b Γ Δ, (a → b, Γ ⊢ a, Δ) → (b, Γ ⊢ Δ) → (a → b, Γ ⊢ Δ)
   | impl :
     ∀ (a b : Form) (xs ys : List Form),
@@ -304,6 +304,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 #eval automatedProofHelper (seq {(p ∨ q), ¬p ⊢ q})
 #eval automatedProofHelper (seq {p ⊢ (q ∨ p)})
 
+#eval! automatedProofHelper (seq {⊢ ((p → (p → q)) → (p → q))})
 #eval automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
 
 #eval! automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))})
@@ -313,5 +314,6 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 --from corsi tassi article
 #eval! automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})
 
+#eval automatedProofHelper (seq { ⊢ ((¬ p → ¬ q) → (q → p))})
 #print axioms automatedProofHelper
 end multiSucc

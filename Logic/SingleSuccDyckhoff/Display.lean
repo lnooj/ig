@@ -106,8 +106,8 @@ instance : ToString Sequent where
 instance : ToString Seq4Proof where
   toString seq4 :=
   match seq4 with
-  | .seq4 as forms imps goal=>
-  (List.map toString as).toString ++ (List.map formToString forms).toString ++ (List.map formToString imps).toString
+  | .seq4 as forms imps aimps goal=>
+  (List.map toString as).toString ++ (List.map formToString forms).toString ++ (List.map formToString imps).toString ++ (List.map formToString aimps).toString
   ++ "⊢" ++ (toString goal)
 
 def indent (n : Nat) (s : String) : String :=

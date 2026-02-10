@@ -34,11 +34,11 @@ inductive Sequent
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
-Atomic formulas and implications are seperated.
+Atomic formulas and implications are seperated. add aimps to deal w last
  -/
--- [x, y], [f1, f2] [imps] ⊢ f
+-- [x, y], [f1, f2] [imps] [aimps] ⊢ f
 inductive Seq4Proof
-  | seq4 : List Atom → List Form → List Form → Form → Seq4Proof
+  | seq4 : List Atom → List Form → List Form → List Form → Form → Seq4Proof
 
 
 end singleSucc
