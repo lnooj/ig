@@ -85,16 +85,17 @@ open Proof
 
 @[simp]
 def Seq4Proof.toSeq : Seq4Proof → Sequent
-| .seq4 atoms₁ forms₁ imps₁ usedImps₁  atoms₂ forms₂ imps₂ _ =>
-  have ant := Multiset.ofList ((atoms₁.map Form.atoms) ++ forms₁ ++ imps₁ ++ usedImps₁)
-  have succ := Multiset.ofList ( (atoms₂.map Form.atoms) ++  forms₂ ++ imps₂)  -- usedImps₂ is to monitor R→ usage, not to display
+| .seq4 atoms₁ forms₁ blocked  atoms₂ forms₂ rightRule _ =>
+  have ant := Multiset.ofList ((atoms₁.map Form.atoms) ++ forms₁ ++ blocked.map Imp.toForm)
+  have succ := Multiset.ofList ((atoms₂.map Form.atoms) ++ forms₂ ++ rightRule.map Imp.toForm)  -- history is to monitor R→ usage, not to display
   Sequent.seq ant succ
 
 def Sequent.toSeq4 : Sequent → Seq4Proof
-| .seq Δ Γ => Seq4Proof.seq4 [] (Multiset.sort Δ LE.le) [] [] [] (Multiset.sort Γ LE.le) [] []
+| .seq Δ Γ => Seq4Proof.seq4 [] (Multiset.sort Δ LE.le) [] [] (Multiset.sort Γ LE.le) [] []
 
 def Proof.castSeqList (x : List (Proof (Sequent.seq (Multiset.ofList a₁) (Multiset.ofList b₁))))
-    (ha : Multiset.ofList a₁ = Multiset.ofList a₂) (hb : Multiset.ofList b₁ = Multiset.ofList b₂) :
+    (ha : Multiset.ofList a₁ = Multiset.ofList a₂ := by simp only [Multiset.coe_eq_coe]; grind)
+    (hb : Multiset.ofList b₁ = Multiset.ofList b₂ := by simp only [Multiset.coe_eq_coe]; grind) :
     List (Proof (Sequent.seq (Multiset.ofList a₂) (Multiset.ofList b₂))) := by rw [ha, hb] at x; exact x
 
 
@@ -116,9 +117,9 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
    või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
  -/
 
-def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.card ≤ cap := by simp at *; grind ) : List (Proof s.toSeq) :=
+def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.card ≤ cap := by simp at *; grind ) (metaR1 : s.rightRule ∩ s.history = ∅ ): List (Proof s.toSeq) :=
   match s with
-  | .seq4 as forms₁ imps₁ usedImps₁  bs forms₂ imps₂ usedImps₂ =>
+  | .seq4 as forms₁ blocked  bs forms₂ rightRule history =>
     match forms₁ with
     | [] =>
       match forms₂ with
@@ -126,119 +127,110 @@ def automatedProof (s : Seq4Proof) (cap : ℕ ) (hcap : s.cap.card ≤ cap := by
         match common : findIntersection as bs with
         -- no common atoms
         | [] =>
-          -- we are left with left imp lists (right usedImps₂ is for monitoring when we've used R→ )
-          match imps₁ with
-          | [] =>
-            match imps₂ with
-            | [] => []
-            | (.imp a b) :: imps₂'  => by --METARULE 1
-              if (.imp a b) ∉ usedImps₂ then
-                have h₁ := automatedProof (.seq4 as [a] ( usedImps₁) [] [] [b] [] ((a ⊃ b)::usedImps₂)) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-                have h₂ := List.map (impr a b (as.map .atoms ++ usedImps₁) (bs.map .atoms ++ imps₂')) (Proof.castSeqList h₁ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
-                apply Proof.castSeqList h₂ (by simp only [List.append_nil]) (by simp only [Multiset.coe_eq_coe]; grind)
-              else -- HERE can try a fortiori METARULE 2
-                have h₁ := automatedProof (.seq4 as [] [] usedImps₁ bs  [b]  imps₂' usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-                simp only [Seq4Proof.toSeq, List.append_nil] at h₁ ⊢
-                have h₂ := List.map (afort a b ((as.map .atoms) ++ usedImps₁) (bs.map .atoms ++ imps₂')) (Proof.castSeqList h₁ (by rfl) (by simp only [Multiset.coe_eq_coe]; grind))
-                apply Proof.castSeqList h₂ (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
-            | _ => []
-          | (.imp a b) :: imps₁' => by
-            have pair₁ := automatedProof (.seq4 as [] imps₁' ((a ⊃ b) :: usedImps₁) bs [a] imps₂ usedImps₂ ) cap -- every implicative formula can be principal form of R→ only once!!
-            have pair₂ := automatedProof (.seq4 as [b] imps₁' (usedImps₁) bs [] imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-            simp only [Seq4Proof.toSeq, List.append_assoc, List.cons_append, List.append_nil, List.nil_append] at pair₁ pair₂ ⊢
-            have h := List.map (impl a b (as.map .atoms ++ imps₁' ++ usedImps₁) (bs.map .atoms ++ imps₂)).uncurry
-                      (getPairs
-                        (Proof.castSeqList pair₁ (by simp only [Multiset.coe_eq_coe]; grind) (by simp only [Multiset.coe_eq_coe]; grind))
-                        (Proof.castSeqList pair₂ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl)))
-            apply Proof.castSeqList h (by simp only [Multiset.coe_eq_coe]; grind) (by rfl)
+          match rightRule with
+          | [] => []
+          | rightRule => --METARULE 1 NONINVERTABLE REEGEL
+            let rightRuleApplications : List (Proof (Sequent.seq ↑(as.map Form.atoms ++ blocked.map Imp.toForm) ↑((bs.map Form.atoms ++ rightRule.map Imp.toForm)))) :=
+              rightRule.attach.flatMap (λ (⟨⟨a, b⟩ , ha⟩ : {i : Imp // i ∈ rightRule}) ↦ by
 
-          | _ :: xs => []
-        -- atomic proofs exist
+                  let inclusion : insert { left := a, right := b } ( collectImpsForm a ∪ collectImpsForm b) ⊆   rightRule.toFinset.biUnion collectImpsImp := by
+                    intro x hx
+                    apply Finset.mem_biUnion.mpr
+                    refine ⟨⟨a,b⟩, by simpa using ha, ?_⟩
+                    simp [collectImpsImp] at hx ⊢
+                    exact hx
+
+                  let eq : blocked.toFinset.biUnion collectImpsImp = (blocked.map Imp.toForm ).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
+
+                  have premise := automatedProof (.seq4 as (a :: (blocked.map Imp.toForm)) [] []  [b] [] (⟨ a, b⟩ :: history)) cap (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind)
+
+                  let f := (impr a b (as.map Form.atoms ++ blocked.map Imp.toForm) (bs.map Form.atoms ++ (rightRule.erase ⟨a, b⟩).map Imp.toForm))
+
+                  simp only [Seq4Proof.toSeq] at premise f ⊢
+                  let res := (Proof.castSeqList premise).map f
+                  exact Proof.castSeqList res (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
+                  )
+            Proof.castSeqList rightRuleApplications (by simp only [List.append_nil]) (by simp only [Multiset.coe_eq_coe]; grind)
+
         | xs => by
           have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
           have corr := findIntersCorr as bs
-          --exact findAtomicProofs (xs) as (imps₁) (usedImps₁) bs (imps₂) (usedImps₂) (Γ)
           have proofs := xs.attach.map (λ ⟨x, hx⟩ ↦
-                        ax (.atoms x) ((as.map Form.atoms) ++ imps₁ ++ usedImps₁) ((bs.map Form.atoms) ++ imps₂)
+                        ax (.atoms x) ((as.map Form.atoms) ++ (blocked.map Imp.toForm)) ((bs.map Form.atoms) ++ (rightRule.map Imp.toForm))
                         (by simp [hx, Γ, corr])
                         (by simp [hx, Γ, corr]))
           simp only [Seq4Proof.toSeq, List.append_nil]; exact proofs
 
       -- open up forms on right side
-      | (.atoms a) :: succForms => by --move atom to succ atoms list
-        have h := automatedProof (.seq4 as [] imps₁ usedImps₁  (bs++[a]) succForms imps₂ usedImps₂) cap
-        unfold Seq4Proof.toSeq; simp
-        unfold Seq4Proof.toSeq at h; simp at h
-        exact h
+      | (.atoms a) :: succForms =>  --move atom to succ atoms list
+        Proof.castSeqList ( automatedProof (.seq4 as [] blocked  (a :: bs) succForms rightRule history) cap) (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
       | ⊥ :: succForms =>  by --botr rule, .bot is ignored
-        have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms imps₂ usedImps₂) cap
-        simp only [Seq4Proof.toSeq, List.append_nil] at h
-        have rule := List.map (botr ((as.map .atoms)++imps₁++usedImps₁) (bs.map .atoms ++ succForms ++ imps₂)) h
+        have premise := automatedProof (.seq4 as [] blocked bs succForms rightRule history) cap
+        simp only [Seq4Proof.toSeq, List.append_nil] at premise
+        have rule := List.map (botr ((as.map .atoms)++ (blocked.map Imp.toForm)) (bs.map .atoms ++ succForms ++ (rightRule.map Imp.toForm))) premise
         simp only [Seq4Proof.toSeq, List.append_nil]
-        apply Proof.castSeqList rule
-        . simp only [List.append_assoc]
-        . simp only [List.append_assoc, Multiset.coe_eq_coe]; grind
+        apply Proof.castSeqList rule (by rfl) (by simp only [Multiset.coe_eq_coe]; grind )
       | (.and a b) :: succForms => by
-        have pair1 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (a :: succForms) imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind [Finset.union_comm, Finset.union_assoc] )
-        have pair2 := automatedProof (.seq4 as [] imps₁ usedImps₁ bs (b :: succForms) imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind [Finset.union_comm, Finset.union_assoc] )
-        simp only [Seq4Proof.toSeq, List.append_nil] at pair1 pair2 ⊢
-        have h := List.map (andr a b ((as.map .atoms) ++ imps₁ ++ usedImps₁) (bs.map .atoms ++ succForms ++ imps₂)).uncurry (getPairs (Proof.castSeqList pair1 (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)) (Proof.castSeqList pair2 (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)))
-        apply Proof.castSeqList h (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
+        have premise₁ := automatedProof (.seq4 as [] blocked bs (a :: succForms) rightRule history) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind [Finset.union_comm, Finset.union_assoc] )
+        have premise₂ := automatedProof (.seq4 as [] blocked bs (b :: succForms) rightRule history) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind [Finset.union_comm, Finset.union_assoc] )
+        simp only [Seq4Proof.toSeq, List.append_nil] at premise₁ premise₂ ⊢
+        have rule := List.map (andr a b ((as.map .atoms) ++ (blocked.map Imp.toForm)) (bs.map .atoms ++ succForms ++ (rightRule.map Imp.toForm))).uncurry
+                        (getPairs
+                          (Proof.castSeqList premise₁ (by rfl) (by simp only [Multiset.coe_eq_coe]; grind))
+                          (Proof.castSeqList premise₂ (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)))
+        apply Proof.castSeqList rule (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
       | (.or a b) :: succForms => by
-        have h₁ := automatedProof (.seq4 as [] imps₁ usedImps₁ bs  (a :: b :: succForms) imps₂ usedImps₂) cap
-        simp only [Seq4Proof.toSeq, List.append_nil] at h₁ ⊢
-        have h₂ := List.map (orr a b ((as.map .atoms) ++ imps₁ ++ usedImps₁) (bs.map .atoms ++ succForms++imps₂)) (Proof.castSeqList h₁ (by rfl) (by simp only [Multiset.coe_eq_coe]; grind))
-        apply Proof.castSeqList h₂ (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
+        have premise := automatedProof (.seq4 as [] blocked bs  (a :: b :: succForms) rightRule history) cap
+        simp only [Seq4Proof.toSeq, List.append_nil] at premise ⊢
+        have rule := List.map (orr a b ((as.map .atoms) ++ (blocked.map Imp.toForm)) (bs.map .atoms ++ succForms ++ (rightRule.map Imp.toForm))) (Proof.castSeqList premise (by rfl) (by simp only [Multiset.coe_eq_coe]; grind))
+        apply Proof.castSeqList rule (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
       | (.imp a b) :: succForms => by --METARULE 4 move to imps list
-        have h := automatedProof (.seq4 as [] imps₁ usedImps₁ bs succForms ((.imp a b)::imps₂) usedImps₂ ) cap
-        simp at h; simp
-        have hΓ : Multiset.ofList (List.map Form.atoms bs ++ (succForms ++ a.imp b :: imps₂)) =
-                  Multiset.ofList (List.map Form.atoms bs ++ a.imp b :: (succForms ++ imps₂)) := by
-                  simp only [ Multiset.coe_eq_coe]
-                  rw [ List.perm_append_left_iff, List.append_cons]
-                  simp only [List.append_assoc,List.cons_append, List.nil_append, List.perm_middle]
-        simp [hΓ] at h; exact h
-
+        -- TODO apply afortiori immediately, if it is in usedImps₂. else: läheb imps listi
+        if ⟨a,b⟩ ∈ history then
+          have premise := automatedProof (.seq4 as [] blocked bs (b :: succForms) rightRule history) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
+          simp only [Seq4Proof.toSeq, List.append_nil] at premise ⊢
+          have rule := List.map (afort a b (as.map .atoms ++ blocked.map Imp.toForm) (bs.map .atoms ++ succForms ++ (rightRule.map Imp.toForm))) (Proof.castSeqList premise (by rfl) (by simp only [Multiset.coe_eq_coe]; grind))
+          apply Proof.castSeqList rule (by rfl) (by simp only [Multiset.coe_eq_coe]; grind)
+        else
+          have proof := automatedProof (.seq4 as [] blocked bs succForms (⟨a,b⟩ :: rightRule) history ) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
+          apply Proof.castSeqList proof (by rfl)
 
     -- open up forms on left side --
     | (.atoms a) :: antForms => by
-      have h := automatedProof (.seq4 (as ++ [a]) antForms imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
-      simp at h; simp; exact h
+      have proof := automatedProof (.seq4 (as ++ [a]) antForms blocked bs forms₂ rightRule history) cap
+      simp [Seq4Proof.toSeq] at proof ⊢
+      exact proof
     | .bot :: antForms => by
-      have h:= [botl (as.map .atoms ++ antForms ++ imps₁ ++ usedImps₁) ((bs.map .atoms) ++ forms₂ ++ imps₂)]
+      have rule := [botl (as.map .atoms ++ antForms ++ (blocked.map Imp.toForm)) ((bs.map .atoms) ++ forms₂ ++ (rightRule.map Imp.toForm))]
       simp only [Seq4Proof.toSeq, List.append_assoc, List.cons_append]
-      apply Proof.castSeqList h
-      . simp only [List.append_assoc, Multiset.coe_eq_coe]; grind
-      . simp only [List.append_assoc]
+      apply Proof.castSeqList rule
     | (.and a b) :: antForms => by
-      have h₁ := automatedProof (.seq4 as (a :: b :: antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap
-      simp only [Seq4Proof.toSeq] at h₁; simp only [Seq4Proof.toSeq]
-      have h₂ := List.map (andl a b ((as.map .atoms) ++ antForms ++ imps₁ ++ usedImps₁) ((bs.map .atoms) ++ forms₂ ++ imps₂)) (Proof.castSeqList h₁ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
-      apply Proof.castSeqList h₂ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl)
+      have premise := automatedProof (.seq4 as (a :: b :: antForms) blocked bs forms₂ rightRule history) cap
+      simp only [Seq4Proof.toSeq] at premise; simp only [Seq4Proof.toSeq]
+      have rule := List.map (andl a b ((as.map .atoms) ++ antForms ++ (blocked.map Imp.toForm)) ((bs.map .atoms) ++ forms₂ ++ (rightRule.map Imp.toForm))) (Proof.castSeqList premise (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
+      apply Proof.castSeqList rule (by simp only [Multiset.coe_eq_coe]; grind) (by rfl)
     | (.or a b) :: antForms => by
-      have pair₁ := automatedProof (.seq4 as (a::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-      have pair₂ := automatedProof (.seq4 as (b::antForms) imps₁ usedImps₁ bs forms₂ imps₂ usedImps₂) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-      simp only [Seq4Proof.toSeq] at pair₁ pair₂ ⊢
-      have h := List.map (orl a b (as.map .atoms ++ antForms++imps₁++ usedImps₁) ((bs.map .atoms)++forms₂++ imps₂)).uncurry
+      have premise₁ := automatedProof (.seq4 as (a::antForms) blocked bs forms₂ rightRule history) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
+      have premise₂ := automatedProof (.seq4 as (b::antForms) blocked bs forms₂ rightRule history) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
+      simp only [Seq4Proof.toSeq] at premise₁ premise₂ ⊢
+      have h := List.map (orl a b (as.map .atoms ++ antForms ++ (blocked.map Imp.toForm)) ((bs.map .atoms) ++ forms₂ ++ (rightRule.map Imp.toForm))).uncurry
                 (getPairs
-                  (Proof.castSeqList pair₁ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
-                  (Proof.castSeqList pair₂ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
+                  (Proof.castSeqList premise₁ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
+                  (Proof.castSeqList premise₂ (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
                 )
       apply Proof.castSeqList h (by simp only [Multiset.coe_eq_coe]; grind) (by rfl)
-    | (.imp a b) :: antForms => by -- METARULE 4, move to imps, dont apply rule yet
-      have h := automatedProof (.seq4 as antForms ((.imp a b)::imps₁) usedImps₁ bs forms₂ imps₂ usedImps₂) cap
-      simp at h; simp
-      have hΓ : Multiset.ofList (List.map Form.atoms as ++ (antForms ++ a.imp b :: (imps₁ ++ usedImps₁))) =
-                Multiset.ofList (List.map Form.atoms as ++ a.imp b :: (antForms ++ (imps₁ ++ usedImps₁))) := by
-                simp only [ Multiset.coe_eq_coe]
-                rw [ List.perm_append_left_iff, List.append_cons]
-                simp only [List.append_assoc,List.cons_append, List.nil_append, List.perm_middle]
-      simp [hΓ] at h; exact h
+    | (.imp a b) :: antForms => by -- TODO does .imp a b go into blocked on the second branch too?
+      have premise₁ := automatedProof (.seq4 as antForms (⟨a, b⟩ :: blocked) bs (a::forms₂) rightRule history ) cap
+      have premise₂ := automatedProof (.seq4 as (b::antForms) blocked bs forms₂ rightRule history) cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
+      simp only [Seq4Proof.toSeq, List.append_assoc, List.cons_append] at premise₁ premise₂ ⊢
+      have h := List.map (impl a b (as.map .atoms ++ antForms ++ (blocked.map Imp.toForm)) (bs.map .atoms ++ forms₂ ++ (rightRule.map Imp.toForm))).uncurry
+                (getPairs (Proof.castSeqList premise₁ ) (Proof.castSeqList premise₂ ))
+      apply Proof.castSeqList h
 
 termination_by s.weight cap hcap
 decreasing_by
 all_goals simp [Seq4Proof.weight]; try grind
-. grind [List.mem_toFinset]
+. simp
 
 
 def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String

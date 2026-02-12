@@ -166,17 +166,23 @@ theorem firstImpPremisePresent_atom_inclusion :
   fun_induction firstImpPremisePresent
   . grind
   . grind
-  . simp; sorry
-  . sorry
+  . simp; intro h hy; sorry
+  . simp; intro h hy; sorry
 
 theorem firstImpPremisePresent_rest_perm :
   firstImpPremisePresent imps atoms = (some f, xs) →
   (f :: xs).Perm imps := by
   fun_induction firstImpPremisePresent
-  . grind
-  . grind
-  . simp; grind
-  . sorry
+  · grind
+  · grind
+  · simp only [Prod.mk.injEq, and_imp]
+    intro h hy
+    rw [← hy]
+    sorry
+  · simp
+    intro h hy
+    rw [← hy]
+    sorry
 
 lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
@@ -191,7 +197,7 @@ def automatedProof (s : Seq4Proof) : List (Proof s.toSeq) :=
         match common : findIntersection as bs with
         | [] =>
           match imps₂ with
-            | [] =>
+            | [] => --mby change order that check imps₁ first as some invertible rules might still be present
               match imps₁ with
                 | [] =>
                   match impO : firstImpPremisePresent aimps as with

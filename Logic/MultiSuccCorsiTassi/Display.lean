@@ -18,6 +18,10 @@ def formToString : Form → String
   | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
   | .imp a b => "(" ++ formToString a ++ " ⊃ " ++ formToString b ++ ")"
 
+def impToString (x : Imp) : String := "(" ++ formToString x.left ++ " ⊃ " ++ formToString x.right ++ ")"
+
+def impToStringBlocked (x : Imp) : String := "(" ++ formToString x.left ++ " ⊃ " ++ formToString x.right ++ ")*"
+
 instance : ToString Form := ⟨formToString⟩
 
 /-
@@ -31,6 +35,9 @@ def Form.encode : Form → List Nat
   | and f g    => [2, (encode f).length] ++ encode f ++ encode g
   | or f g     => [3, (encode f).length] ++ encode f ++ encode g
   | imp f g    => [4, (encode f).length] ++ encode f ++ encode g
+
+@[simp]
+def Imp.encode (x : Imp) : List Nat := x.left.encode ++ x.right.encode
 
 lemma Atom.ext {a b : Atom} (h : a.atom = b.atom) : a = b := by
   cases a; cases b
@@ -68,6 +75,18 @@ theorem form_inj {f : Form} (h : f.encode = g.encode) :
     have := List.append_inj_right h2 h1
     have hn := List.append_inj_left' h2 (congrArg List.length this)
     exact ⟨form_inj hn, form_inj this⟩
+/-
+theorem imp_inj {x y : Imp} (h : x.encode = y.encode) :
+  x = y := by
+  cases x
+  cases y
+  simp [Imp.encode] at h;
+  obtain hu := List.append_inj h
+  have hlen_total := congrArg List.length h
+  simp [List.length_append] at hlen_total
+  --exact Nat.add_left_cancel hlen_total
+  have ⟨hleft, hright⟩ := hu (by sorry)
+  simp; sorry -/
 
 /-
   We can give a canonical ordering to `Form`s using our encodings
@@ -77,6 +96,9 @@ theorem form_inj {f : Form} (h : f.encode = g.encode) :
 
 instance : LinearOrder Form :=
   LinearOrder.lift' Form.encode (fun _ _ h => form_inj h)
+
+/- instance : LinearOrder Imp :=
+  LinearOrder.lift' Imp.encode (fun _ _ h => imp_inj h) -/
 
 /- `LinearOrder Nat` is already defined in the library
    But `Form` is our own type, so we need to give it one
@@ -106,9 +128,9 @@ instance : ToString Sequent where
 instance : ToString Seq4Proof where
   toString seq4 :=
   match seq4 with
-  | .seq4 as forms₁ imps₁ _  bs forms₂ imps₂ _=>
-  (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map formToString imps₁).toString
-  ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString ++ (List.map formToString imps₂).toString
+  | .seq4 as forms₁ blocked bs forms₂ rightRule _ =>
+  (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map impToStringBlocked blocked).toString
+  ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString ++ (List.map impToString rightRule).toString
 
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))

@@ -71,30 +71,37 @@ end Weight
 
 
 @[simp, grind]
-def collectImps (x : Form) : Finset Form :=
+def collectImpsForm (x : Form) : Finset Imp :=
 match x with
   | .bot | .atoms _ =>  ∅
-  | .and a b | .or a b => collectImps a ∪ collectImps b
-  | .imp a b => {.imp a b} ∪ collectImps a ∪ collectImps b
+  | .and a b | .or a b => collectImpsForm a ∪ collectImpsForm b
+  | .imp a b => {⟨a, b⟩} ∪ collectImpsForm a ∪ collectImpsForm b
+
+@[simp, grind]
+def collectImpsImp (x : Imp) : Finset Imp := {x} ∪ collectImpsForm x.left ∪ collectImpsForm x.right
+
+@[simp, grind =]
+theorem collectImps_equality : ∀ (x : Imp), collectImpsImp x = collectImpsForm (x.toForm) :=
+  by simp only [collectImpsImp, Finset.singleton_union, Finset.insert_union, Imp.toForm, collectImpsForm, implies_true]
 
 /-- Limit for our Weight relatiom
 - cap represents the max nr of forms that can be the principal for R→,
 - it is a Finset (not a List as before), because any imp form can be principal of R→ ONLY ONCE, so we dont care about order nor duplicates
 - we need it to still be a set, not just it's cardinality to show subset relations in proof (no new implications are made, set will only get smaller)
 - cardinality of this set is used for proving well-foundedness
-- every imp list is gone through recursively to collect ALL implications, exept the R→ list itsself (usedImps₂)-/
+- every imp list is gone through recursively to collect ALL implications, exept the R→ list itsself (history)-/
 @[simp, grind]
-def Seq4Proof.cap (p : Seq4Proof) : Finset Form:=
+def Seq4Proof.cap (p : Seq4Proof) : Finset Imp:=
 match p with
-| .seq4 _  forms₁ imps₁ usedImps₁ _ forms₂ imps₂ usedImps₂  =>
-   ((forms₁.toFinset.biUnion collectImps) ∪ (imps₁.toFinset.biUnion collectImps) ∪ (usedImps₁.toFinset.biUnion collectImps) ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
-   usedImps₂.toFinset ∪ (imps₂.toFinset.biUnion collectImps) ∪ (forms₂.toFinset.biUnion collectImps))
+| .seq4 _  forms₁ blocked _ forms₂ rightImp history =>
+   ((forms₁.toFinset.biUnion collectImpsForm) ∪ (blocked.toFinset.biUnion collectImpsImp) ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
+  (forms₂.toFinset.biUnion collectImpsForm) ∪ (rightImp.toFinset.biUnion collectImpsImp) ∪ history.toFinset) -- rightImp gets also counted recursively, because when applying R→ the left and right side go to forms
 
-/-- occurences of R→ rule so far, stored in usedImps₂  -/
+/-- occurences of R→ rule so far, stored in history  -/
 @[simp, grind]
-def Seq4Proof.r (p: Seq4Proof) : Finset Form :=
+def Seq4Proof.r (p: Seq4Proof) : Finset Imp :=
 match p with
-| .seq4 _ _ _ _ _ _ _ usedImps₂  => usedImps₂.toFinset
+| .seq4 _ _ _ _ _ _ history  => history.toFinset
 
 @[simp, grind .]
 theorem Seq4Proof.r_subset_cap (p : Seq4Proof) : p.r ⊆ p.cap := by simp only [r, cap, Finset.union_assoc]; grind
@@ -108,12 +115,12 @@ def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ) (hcap : p.cap.card ≤ cap) : W
 let r := p.r.card
 let n :=
   match p with
-  | .seq4 atoms₁ forms₁ imps₁ usedImps₁ atoms₂ forms₂ imps₂ _  =>
-      let cL := size_sum_increased forms₁--(countPrinciple forms₁ usedImps₁)-- forms in usedImps₁ can not be principle PRINCIPLE LOGIC NOT USED
+  | .seq4 atoms₁ forms₁ blocked atoms₂ forms₂ rightRule _  =>
+      let cL := size_sum forms₁--(countPrinciple forms₁ blocked)-- forms in blocked can not be principle PRINCIPLE LOGIC NOT USED
       let cR := size_sum_increased forms₂ --any imp on right side can be principle, bc either a fort is used or R→
-      let cImpL := size_sum imps₁
-      let cImpR := size_sum imps₂
-      cL + cR + cImpL + cImpR
+      --let cImpL := size_sum imps₁
+      let cImpR := size_sum (rightRule.map Imp.toForm)
+      cL + cR + cImpR--+ cImpL + cImpR
 let h : p.r.card ≤ p.cap.card := by
   simp only [Seq4Proof.cap, Finset.union_assoc, Seq4Proof.r];
   apply (Finset.card_le_card ?_); grind
