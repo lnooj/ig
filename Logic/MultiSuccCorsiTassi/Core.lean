@@ -14,6 +14,7 @@ inductive Form
 | imp : Form → Form → Form
 deriving DecidableEq, Repr
 
+@[grind]
 structure Imp where
   left  : Form
   right : Form
@@ -39,28 +40,30 @@ def Imp.toForm (i : Imp) : Form :=
 
 /- Using Multisets to not worry about order of forms -/
 -- [f1, f2] ⊢ [g1, g2]
-inductive Sequent
-  | seq : Multiset Form → Multiset Form → Sequent
+/- inductive Sequent
+  | seq : Multiset Form → Multiset Form → Sequent -/
 --deriving Repr
-/- structure Sequent where
+@[grind]
+structure Sequent where
   Γ : Multiset Form
-  Δ : Multiset Form -/
+  Δ : Multiset Form
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
 [x, y], [f1, f2], usable[imp1, imp2], nonusable[imp1, imp2] ⊢ [x, y], [g1, g2], usable[imp1, imp2], used[imp1, imp2]
  -/
-inductive Seq4Proof
+/- inductive Seq4Proof
   | seq4 : (atomsL : List Atom) → (formulasL : List Form) → (blocked : List Imp) → /- (blockedImps : List Form)  →  -/
             (atomsR : List Atom) → (formulasR : List Form) → (rightImp : List Imp) → (history :  List Imp) /- → (usedimps : List Form) -/ → Seq4Proof
---deriving Repr
-/- structure Seq4Proof where
-  atomsL : List Atom
-  formulasL : List Form
-  blocked : List Imp
-  atomsR : List Atom
-  formulasR : List Form
-  rightImp : List Imp
-  history : List Imp -/
+ -/--deriving Repr
+@[grind]
+structure Seq4Proof where
+  as : List Atom
+  fL : List Form
+  block : List Imp
+  bs : List Atom
+  fR : List Form
+  impR : List Imp
+  hist : List Imp
 
 end multiSucc

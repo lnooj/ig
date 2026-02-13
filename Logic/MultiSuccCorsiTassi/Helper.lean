@@ -92,16 +92,12 @@ theorem collectImps_equality : ∀ (x : Imp), collectImpsImp x = collectImpsForm
 - every imp list is gone through recursively to collect ALL implications, exept the R→ list itsself (history)-/
 @[simp, grind]
 def Seq4Proof.cap (p : Seq4Proof) : Finset Imp:=
-match p with
-| .seq4 _  forms₁ blocked _ forms₂ rightImp history =>
-   ((forms₁.toFinset.biUnion collectImpsForm) ∪ (blocked.toFinset.biUnion collectImpsImp) ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
-  (forms₂.toFinset.biUnion collectImpsForm) ∪ (rightImp.toFinset.biUnion collectImpsImp) ∪ history.toFinset) -- rightImp gets also counted recursively, because when applying R→ the left and right side go to forms
+   ((p.fL.toFinset.biUnion collectImpsForm) ∪ (p.block.toFinset.biUnion collectImpsImp) ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
+  (p.fR.toFinset.biUnion collectImpsForm) ∪ (p.impR.toFinset.biUnion collectImpsImp) ∪ p.hist.toFinset) -- rightImp gets also counted recursively, because when applying R→ the left and right side go to forms
 
 /-- occurences of R→ rule so far, stored in history  -/
 @[simp, grind]
-def Seq4Proof.r (p: Seq4Proof) : Finset Imp :=
-match p with
-| .seq4 _ _ _ _ _ _ history  => history.toFinset
+def Seq4Proof.r (p: Seq4Proof) : Finset Imp := p.hist.toFinset
 
 @[simp, grind .]
 theorem Seq4Proof.r_subset_cap (p : Seq4Proof) : p.r ⊆ p.cap := by simp only [r, cap, Finset.union_assoc]; grind
@@ -114,12 +110,10 @@ theorem Seq4Proof.r_subset_cap (p : Seq4Proof) : p.r ⊆ p.cap := by simp only [
 def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ) (hcap : p.cap.card ≤ cap) : Weight cap :=
 let r := p.r.card
 let n :=
-  match p with
-  | .seq4 atoms₁ forms₁ blocked atoms₂ forms₂ rightRule _  =>
-      let cL := size_sum forms₁--(countPrinciple forms₁ blocked)-- forms in blocked can not be principle PRINCIPLE LOGIC NOT USED
-      let cR := size_sum_increased forms₂ --any imp on right side can be principle, bc either a fort is used or R→
+      let cL := size_sum p.fL--(countPrinciple forms₁ blocked)-- forms in blocked can not be principle PRINCIPLE LOGIC NOT USED
+      let cR := size_sum_increased p.fR --any imp on right side can be principle, bc either a fort is used or R→
       --let cImpL := size_sum imps₁
-      let cImpR := size_sum (rightRule.map Imp.toForm)
+      let cImpR := size_sum (p.impR.map Imp.toForm)
       cL + cR + cImpR--+ cImpL + cImpR
 let h : p.r.card ≤ p.cap.card := by
   simp only [Seq4Proof.cap, Finset.union_assoc, Seq4Proof.r];

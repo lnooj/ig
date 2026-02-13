@@ -10,19 +10,20 @@ open multiSucc
 instance : ToString Atom where
   toString | .mk 1 => "p" | .mk 2 => "q" | .mk 3 => "r" | .mk _ => "undefined"
 
-def formToString : Form → String
+def Form.toString : Form → String
   | .bot => "⊥"
-  | .atoms a => toString a
-  | .neg a => s!"¬{formToString a}"
-  | .and a b => s!"({formToString a} ∧ {formToString b})"
-  | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
-  | .imp a b => "(" ++ formToString a ++ " ⊃ " ++ formToString b ++ ")"
+  | .atoms a => ToString.toString a
+  | .imp a .bot => s!"¬{a.toString}"
+  -- | .neg a => s!"¬{formToString a}"
+  | .and a b => s!"({a.toString} ∧ {b.toString})"
+  | .or a b => "(" ++ a.toString ++ " ∨ " ++ b.toString ++ ")"
+  | .imp a b => "(" ++ a.toString ++ " ⊃ " ++ b.toString ++ ")"
 
-def impToString (x : Imp) : String := "(" ++ formToString x.left ++ " ⊃ " ++ formToString x.right ++ ")"
+def Imp.toString (x : Imp) : String := x.toForm.toString
 
-def impToStringBlocked (x : Imp) : String := "(" ++ formToString x.left ++ " ⊃ " ++ formToString x.right ++ ")*"
+def Imp.toStringBlocked (x : Imp) : String := x.toString ++ "*"
 
-instance : ToString Form := ⟨formToString⟩
+instance : ToString Form := ⟨Form.toString⟩
 
 /-
   Ordering formulas is more tricky since we are dealing with tree-like structures
@@ -120,17 +121,14 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 #eval Multiset.sort example2 LE.le
 
 instance : ToString Sequent where
-  toString xseq :=
-  match xseq with
-  | .seq Γ Δ => String.intercalate ", " (List.map formToString (Multiset.sort Γ LE.le ))
-    ++ " ⊢ " ++ String.intercalate ", " (List.map formToString (Multiset.sort Δ LE.le ))
+  toString seq :=
+  String.intercalate ", " ((Multiset.sort seq.Γ LE.le ).map Form.toString )
+    ++ " ⊢ " ++ String.intercalate ", " ((Multiset.sort seq.Δ LE.le ).map Form.toString )
 
 instance : ToString Seq4Proof where
   toString seq4 :=
-  match seq4 with
-  | .seq4 as forms₁ blocked bs forms₂ rightRule _ =>
-  (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map impToStringBlocked blocked).toString
-  ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString ++ (List.map impToString rightRule).toString
+  (seq4.as.map toString ).toString ++ (seq4.fL.map Form.toString ).toString ++ (seq4.block.map Imp.toStringBlocked ).toString
+  ++ "⊢" ++ (seq4.bs.map toString).toString  ++ (seq4.fR.map Form.toString).toString ++ (seq4.impR.map Imp.toString ).toString
 
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
@@ -139,7 +137,7 @@ def horizontalLine (n : Nat) : String :=
   String.join (List.replicate n "-")
 
 def listToString (xs : List Form) : String :=
-  String.intercalate ", " (xs.map formToString)
+  String.intercalate ", " (xs.map Form.toString)
 
 -- Forward declaration needed for proofToString (requires Proof type from MultiSuccCorsiTassi)
 -- proofToString and listProofToString will be defined in MultiSuccCorsiTassi.lean
