@@ -227,7 +227,7 @@ def automatedProof (s : Seq4Proof) : List (Proof s.toSeq) :=
                     simp only [Seq4Proof.toSeq, List.append_nil] at h ⊢
                     have proofs := List.map (impl₃ c d b ((as.map .atoms) ++ antImps ++ aimps) (bs.map .atoms )) (Proof.castSeqList h (by simp only [Multiset.coe_eq_coe]; grind) (by rfl))
                     apply Proof.castSeqList proofs (by simp only [Multiset.coe_eq_coe]; grind) (by rfl)
-                  | .imp c d => by
+                  | .imp c d => by -- should be done last!!!!
                     have h₁ := automatedProof (.seq4 as [] ((d ⊃ b) :: antImps) aimps [] [] [c ⊃ d]) --put them straight into imps list
                     have h₂ := automatedProof (.seq4 as [b] antImps aimps bs [] [])
                     simp only [Seq4Proof.toSeq, List.append_nil] at h₁ h₂ ⊢
