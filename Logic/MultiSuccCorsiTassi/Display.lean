@@ -51,6 +51,33 @@ instance : ToString World where
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
 
+def cmToString : CM → String
+| ⟨w, []⟩ => toString w
+| ⟨w, bs⟩ =>
+  let bstrs := bs.map cmToString
+  toString w ++ "\n " ++ indent 0 (String.intercalate "  |  " bstrs)
+/- partial def cmToString (cm : CM) (indent : String := "") : String :=
+  let worldStr := toString cm.world
+  match cm.branch with
+  | [] => indent ++ worldStr
+  | branches =>
+    let branchStrs := branches.map (fun child =>
+      cmToString child (indent ++ "| ")
+    )
+    indent ++ worldStr ++ "\n" ++ (String.intercalate "\n" branchStrs) -/
+--termiantion_by cm.depth
+
+instance : ToString CM where
+  toString cm := cmToString cm
+
+instance : ToString TV where
+  toString tv :=
+  match tv with
+  | .t => "T"
+  | .f => "F"
+  | .u => "U"
+
+
 def horizontalLine (n : Nat) : String :=
   String.join (List.replicate n "-")
 
