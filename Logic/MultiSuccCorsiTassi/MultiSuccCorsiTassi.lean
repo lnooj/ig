@@ -29,9 +29,9 @@ Added a fortiori
 inductive Proof : Sequent → Type
   -- ∀ x Γ, x ++ Γ ⊢ x ++ Δ
   | ax :
-    ∀ (x : Form) (xs ys: List Form),
-      (hxs : x ∈ xs) →
-      (hys : x ∈ ys) →
+    ∀ (x : Atom) (xs ys: List Form),
+      (hxs : .atoms x ∈ xs) →
+      (hys : .atoms x ∈ ys) →
       Proof ⟨↑xs, ↑ys⟩
   -- ∀ Δ Γ, (⊥, Γ ⊢ Δ)
   | botl :
@@ -83,15 +83,13 @@ inductive Proof : Sequent → Type
 --deriving Repr
 open Proof
 
-
+--give sequent, hist, blocked
 inductive Result (s : Sequent) where
 | proof : List (Proof s) → Result s
 | cm : List CM  → Result s
+-- | refutation List (Refutation s.toSeq4)
+-- | refutation List (Refutation (s, h, impB))
 
-def Result.bind (r : Result s) (k : List (Proof s) → Result s') : Result s' :=
-  match r with
-  | .proof ps => k ps
-  | .cm cms   => .cm cms
 
 def Result.map (r : Result s) (k : List (Proof s) → List (Proof s')) : Result s' :=
   match r with
@@ -115,11 +113,6 @@ def Result.castSeq (x : Result ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩)
   (hb : Multiset.ofList b₁ = Multiset.ofList b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
   Result ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩ := by rw [ha, hb] at x; exact x
 
-/- choices :: [[a]] -> [[a]]
-choices [] = [[]]
-choices ([]:xss) = []
-choices ((x:xs):xss) =
-   map (x:) (choices xss) ++ choices (xs:xss) -/
 
 -- [[1,2] [3] [4,5]] = [[1,3,4] [1,3,5] [2,3,4] [2,3,5]]
 def choicesCM : List (List CM) → List (List CM)
@@ -141,16 +134,7 @@ def pickproof : List (Result r) → List (Result r)
       | _ => false)
   else
     proofs
-/- | [] => []
-| .proof p :: rs =>
-  match pickproof rs with
-  | .cm _ => .proof p
-  | .proof p' => .proof (p ++ p')
-| .cm cm :: rs =>
-  match pickproof rs with
-  | .cm cm' => .cm (cm ++ cm')
-  | .proof p => .proof p
- -/
+
 
 
 lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
@@ -172,7 +156,8 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 def automatedProof (s : Seq4Proof) (cap : ℕ )
                   (hcap : s.cap.card ≤ cap := by simp at *; grind )
-                  (metaR1 : s.impR ∩ s.hist = ∅ := by grw [metaR1]) : Result s.toSeq :=
+                  (metaR1 : s.impR ∩ s.hist = ∅ := by grw [metaR1]) :
+                   Result s.toSeq :=
   match s with
   | {as, fL, block,  bs, fR, impR, hist} =>
     match fL with
@@ -186,23 +171,23 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
           | [] => dbg_trace "everything empt; {as} {bs} {s.world}"; Result.cm [⟨s.world, []⟩]
           | impR => --METARULE 1 NONINVERTABLE REEGEL
             let impRApplications : List (Result ⟨↑(as.map Form.atoms ++ block.map Imp.toForm), ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩) :=
-              impR.attach.map (λ (⟨⟨a, b⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦ by
+              impR.attach.map (λ (⟨⟨f, g⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦ by
 
-                  have inclusion : insert { left := a, right := b } ( collectImpsForm a ∪ collectImpsForm b) ⊆   impR.toFinset.biUnion collectImpsImp := by
+                  have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆   impR.toFinset.biUnion collectImpsImp := by
                     intro x hx
                     apply Finset.mem_biUnion.mpr
-                    refine ⟨⟨a,b⟩, by simpa using ha, ?_⟩
+                    refine ⟨⟨f,g⟩, by simpa using ha, ?_⟩
                     simp [collectImpsImp] at hx ⊢
                     exact hx
 
                   have eq : block.toFinset.biUnion collectImpsImp = (block.map Imp.toForm ).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
 
-                  have premise := automatedProof ⟨as, (a :: (block.map Imp.toForm)), [], [], [b], [], (⟨ a, b⟩ :: hist)⟩ cap (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind) (by simp)
-                  let f := (impr a b (as.map Form.atoms ++ block.map Imp.toForm) (bs.map Form.atoms ++ (impR.erase ⟨a, b⟩).map Imp.toForm))
+                  have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind) (by simp)
+                  let rule := (impr f g (as.map Form.atoms ++ block.map Imp.toForm) (bs.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm))
 
-                  simp only [Seq4Proof.toSeq] at premise f ⊢
+                  simp only [Seq4Proof.toSeq] at premise rule ⊢
                   exact premise.map fun pf =>
-                    let res := (Proof.castSeqList pf).map f
+                    let res := (Proof.castSeqList pf).map rule
                     Proof.castSeqList res
                   )
             have res := pickproof impRApplications
@@ -228,14 +213,16 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                       | Result.cm cs => cs :: acc
                       | _ => acc)
                     []
-                exact Result.cm (choicesCM cmsLists).flatten
-            --Result.proof (Proof.castSeqList impRApplications (by simp only [List.append_nil]) (by simp only [Multiset.coe_eq_coe]; grind))
+                exact Result.cm ((choicesCM cmsLists).map
+                                  (λ cms ↦
+                                    let b : List Atom := cms.flatMap (λ c : CM ↦ c.world.unforced)
+                                    ⟨⟨s.world.forced, s.world.unforced ++ b⟩, cms⟩))  --uus juur lisada + iga vahetu lapse bs
 
         | xs => by
           have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
           have corr := findIntersCorr as bs
           have proofs := xs.attach.map (λ ⟨x, hx⟩ ↦
-                        ax (.atoms x) ((as.map Form.atoms) ++ (block.map Imp.toForm)) ((bs.map Form.atoms) ++ (impR.map Imp.toForm))
+                        ax ( x) ((as.map Form.atoms) ++ (block.map Imp.toForm)) ((bs.map Form.atoms) ++ (impR.map Imp.toForm))
                         (by simp [hx, Γ, corr])
                         (by simp [hx, Γ, corr]))
           simp only [Seq4Proof.toSeq, List.append_nil]; exact Result.proof proofs
@@ -322,13 +309,13 @@ termination_by s.weight cap hcap
 decreasing_by
 all_goals simp [Seq4Proof.weight]; try grind
 . simp at *
-  have hx : { left := a, right := b } ∉ hist := by
+  have hx : { f, g} ∉ hist := by
     intro hmem
-    have : { left := a, right := b } ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
+    have : { f, g} ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
     simp [metaR1] at this
-  have hxFin : { left := a, right := b } ∉ hist.toFinset := by simp; exact hx
-  have hcard : hist.toFinset.card < (insert { left := a, right := b } hist.toFinset).card := by
-    have : (insert { left := a, right := b } hist.toFinset).card = hist.toFinset.card + 1 := Finset.card_insert_of_notMem hxFin
+  have hxFin : { f, g} ∉ hist.toFinset := by simp; exact hx
+  have hcard : hist.toFinset.card < (insert { f, g} hist.toFinset).card := by
+    have : (insert { f, g} hist.toFinset).card = hist.toFinset.card + 1 := Finset.card_insert_of_notMem hxFin
     grind
   grind
 
@@ -376,11 +363,7 @@ def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String
   let ruleLine := s!"→AF: {listToString xs} ⊢ {a} → {b}, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 
-def cmToString : CM → String
-| ⟨w, []⟩ => toString w
-| ⟨w, bs⟩ =>
-  let bstrs := bs.map cmToString
-  toString w ++ " { " ++ String.intercalate " | " bstrs ++ " }"
+
 
 
 def listProofToString : List (Proof xseq) → String
@@ -398,29 +381,34 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
   match res with
   | .proof ps => String.toFormat (listProofToString ps)
   | .cm cms =>
-    let strs := cms.map cmToString
-    String.toFormat ("CM: [" ++ String.intercalate "][ " strs ++ "]")
+    if cms.all (fun cm => evalSeq s cm == TV.f) then
+      let strs := cms.map toString
+      String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]")
+    else  dbg_trace "APPI {cms.map (fun cm => evalSeq s cm) }"
+      let strs := cms.map toString
+      String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]")
 
 
 --modusponens "a → b, a ⊢ β"
-#eval automatedProofHelper (seq {(p → q), p ⊢ q})
-#eval automatedProofHelper (seq {(p ∨ q), ¬p ⊢ q})
-#eval automatedProofHelper (seq {p ⊢ (q ∨ p)})
+#eval! automatedProofHelper (seq {(p → q), p ⊢ q})
+#eval! automatedProofHelper (seq {(p ∨ q), ¬p ⊢ q})
+#eval! automatedProofHelper (seq {p ⊢ (q ∨ p)})
 
 #eval! automatedProofHelper (seq {⊢ ((p → (p → q)) → (p → q))})
-#eval automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
+#eval! automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
 
 #eval! automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))})
 
-#eval automatedProofHelper (seq {⊢ ¬¬ (¬p ∨ p)})
-#eval automatedProofHelper (seq {(p → r), (q → ¬r) ⊢ ¬(p ∧ q)})
+#eval! automatedProofHelper (seq {⊢ ¬¬ (¬p ∨ p)})
+#eval! automatedProofHelper (seq {(p → r), (q → ¬r) ⊢ ¬(p ∧ q)})
 --from corsi tassi article
 #eval! automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})
 
-#eval automatedProofHelper (seq { ⊢ ((¬ p → ¬ q) → (q → p))})
-
-#eval automatedProofHelper (seq {⊢ (((p → q )→ p) → p)})
-#eval automatedProofHelper (seq {⊢ (p ∨ ¬p )})
-#eval automatedProofHelper (seq {⊢ ¬¬(p ∨ ¬p )})
+#eval! automatedProofHelper (seq { ⊢ ((¬ p → ¬ q) → (q → p))})
+-- Pierce ((p → q )→ p) → p
+#eval! automatedProofHelper (seq {⊢ (((p → q )→ p) → p)})
+#eval! automatedProofHelper (seq {⊢ (p ∨ ¬p )})
+#eval! automatedProofHelper (seq {⊢ ¬¬(p ∨ ¬p )})
+--#eval! evaluate (form {((¬ p → ¬ q) → (q → p))})
 #print axioms automatedProofHelper
 end multiSucc

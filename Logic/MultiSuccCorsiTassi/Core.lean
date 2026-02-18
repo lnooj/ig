@@ -18,8 +18,8 @@ deriving DecidableEq, Repr
 
 @[grind]
 structure Imp where
-  left  : Form
-  right : Form
+  f  : Form
+  g : Form
 deriving DecidableEq, Repr
 
 -- such notation is used as not to confuse with Lean's internal logic notation
@@ -34,7 +34,7 @@ def Form.neg (a : Form) : Form :=  a ⊃ ⊥
 
 @[simp, grind]
 def Imp.toForm (i : Imp) : Form :=
-  i.left ⊃ i.right
+  i.f ⊃ i.g
 
 /- Using Multisets to not worry about order of forms -/
 @[grind]
@@ -69,7 +69,7 @@ def Form.encode : Form → List Nat
   | imp f g    => [4, (encode f).length] ++ encode f ++ encode g
 
 @[simp]
-def Imp.encode (x : Imp) : List Nat := x.left.encode ++ x.right.encode
+def Imp.encode (x : Imp) : List Nat := x.f.encode ++ x.g.encode
 
 lemma Atom.ext {a b : Atom} (h : a.atom = b.atom) : a = b := by
   cases a; cases b
@@ -142,7 +142,7 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 @[simp]
 def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
   have ant := Multiset.ofList ((p.as.map .atoms) ++ p.fL ++ p.block.map Imp.toForm)
-  have succ := Multiset.ofList ((p.bs.map Form.atoms) ++ p.fR ++ p.impR.map Imp.toForm)  -- hist is to monitor R→ usage, not to display
+  have succ := Multiset.ofList ((p.bs.map .atoms) ++ p.fR ++ p.impR.map Imp.toForm)  -- hist is to monitor R→ usage, not to display
   ⟨ant, succ⟩
 
 def Sequent.toSeq4 (s : Sequent) : Seq4Proof :=

@@ -78,7 +78,7 @@ match x with
   | .imp a b => {⟨a, b⟩} ∪ collectImpsForm a ∪ collectImpsForm b
 
 @[simp, grind]
-def collectImpsImp (x : Imp) : Finset Imp := {x} ∪ collectImpsForm x.left ∪ collectImpsForm x.right
+def collectImpsImp (x : Imp) : Finset Imp := {x} ∪ collectImpsForm x.f ∪ collectImpsForm x.g
 
 @[simp, grind =]
 theorem collectImps_equality : ∀ (x : Imp), collectImpsImp x = collectImpsForm (x.toForm) :=

@@ -76,14 +76,16 @@ def evaluate : Form → CM → TV
   else if (evaluate f cm == .t && evaluate g cm == .f)
       || (cm.branch.map (λ cm' => evaluate (f ⊃ g) cm' == .f)).any id then .f --only one false
   else dbg_trace "imp undefined";.u
-| .impB f g, cm =>
-  if (cm.branch.map (λ cm' => evaluate (f ⊃ g) cm' == .t)).all id then .t
-  else if (cm.branch.map (λ cm' => evaluate (f ⊃ g) cm' == .f)).any id then .f
-  else .u
+
 termination_by fm cm => (sizeOf_Form fm, cm.depth)
 decreasing_by
 all_goals first | (apply Prod.Lex.left; grind) | (apply Prod.Lex.right; apply depth_lt_of_mem; grind)
 
+def evalBlocked : Imp → CM → TV
+| {f, g}, cm =>
+  if (cm.branch.map (λ cm' => evaluate (f ⊃ g) cm' == .t)).all id then .t
+  else if (cm.branch.map (λ cm' => evaluate (f ⊃ g) cm' == .f)).any id then .f
+  else .u
 
 def evalAnt (Γ : List Form) (cm : CM) : TV :=
 match Γ with
@@ -97,8 +99,8 @@ match Δ with
 
 
 -- A sequent is refutable iff all its assumptions are satisfied (all forms in Γ are true) but none of the conclusions are (all Δ are false)
-def evalSeq : Sequent → CM → TV
-| ⟨Γ, Δ ⟩, cm =>
+def evalSeq : Sequent /- → List Imp -/ → CM → TV
+| ⟨Γ, Δ ⟩, /- bl, -/ cm =>
   match (evalAnt (Multiset.sort Γ LE.le) cm) , (evalSucc (Multiset.sort Δ LE.le) cm) with
   | .u, _ | _, .u => .u
   | .t, .f => .f
