@@ -10,82 +10,28 @@ open multiSucc
 instance : ToString Atom where
   toString | .mk 1 => "p" | .mk 2 => "q" | .mk 3 => "r" | .mk _ => "undefined"
 
-def formToString : Form → String
+def Form.toString : Form → String
   | .bot => "⊥"
-  | .atoms a => toString a
-  | .neg a => s!"¬{formToString a}"
-  | .and a b => s!"({formToString a} ∧ {formToString b})"
-  | .or a b => "(" ++ formToString a ++ " ∨ " ++ formToString b ++ ")"
-  | .imp a b => "(" ++ formToString a ++ " ⊃ " ++ formToString b ++ ")"
+  | .atoms a => ToString.toString a
+  | .imp a .bot => s!"¬{a.toString}"
+  | .and a b => s!"({a.toString} ∧ {b.toString})"
+  | .or a b => "(" ++ a.toString ++ " ∨ " ++ b.toString ++ ")"
+  | .imp a b => "(" ++ a.toString ++ " ⊃ " ++ b.toString ++ ")"
 
-instance : ToString Form := ⟨formToString⟩
-
-/-
-  Ordering formulas is more tricky since we are dealing with tree-like structures
-  We encode them into lists of nats (question: can we use `Nat` as encoding? Why or why not?)
--/
-@[simp]
-def Form.encode : Form → List Nat
-  | bot        => [0]
-  | atoms a    => [1, a.atom]
-  | and f g    => [2, (encode f).length] ++ encode f ++ encode g
-  | or f g     => [3, (encode f).length] ++ encode f ++ encode g
-  | imp f g    => [4, (encode f).length] ++ encode f ++ encode g
-
-lemma Atom.ext {a b : Atom} (h : a.atom = b.atom) : a = b := by
-  cases a; cases b
-  simp_all
-
-theorem form_inj {f : Form} (h : f.encode = g.encode) :
-  f = g := by
-  match f, g with
-  | .bot, .bot => rfl
-  | .bot, .atoms _ => simp only [Form.encode, List.cons.injEq, Nat.zero_ne_one, List.ne_cons_self,
-    and_self] at h
-  | .atoms _, .bot => simp only [Form.encode, List.cons.injEq, Nat.succ_ne_self, List.cons_ne_self,
-    and_self] at h
-  | .atoms a, .atoms b =>
-    simp only [Form.encode, List.cons.injEq, and_true, true_and] at h
-    apply congrArg Form.atoms (Atom.ext h)
-  | .and f g, .and f' g' =>
-    simp_all only [Form.encode, List.cons_append, List.nil_append, List.cons.injEq, true_and,
-      Form.and.injEq]
-    let ⟨h1,h2⟩ := h
-    have := List.append_inj_right h2 h1
-    have hn := List.append_inj_left' h2 (congrArg List.length this)
-    exact ⟨form_inj hn, form_inj this⟩
-  | .or f g, .or f' g' =>
-    simp_all only [Form.encode, List.cons_append, List.nil_append, List.cons.injEq, true_and,
-      Form.or.injEq]
-    let ⟨h1,h2⟩ := h
-    have := List.append_inj_right h2 h1
-    have hn := List.append_inj_left' h2 (congrArg List.length this)
-    exact ⟨form_inj hn, form_inj this⟩
-  | .imp f g, .imp f' g' =>
-    simp_all only [Form.encode, List.cons_append, List.nil_append, List.cons.injEq, true_and,
-      Form.imp.injEq]
-    let ⟨h1,h2⟩ := h
-    have := List.append_inj_right h2 h1
-    have hn := List.append_inj_left' h2 (congrArg List.length this)
-    exact ⟨form_inj hn, form_inj this⟩
-
-
-instance : LinearOrder Form :=
-  LinearOrder.lift' Form.encode (fun _ _ h => form_inj h)
+def Imp.toString (x : Imp) : String := x.toForm.toString
+def aImp.toString (x : aImp) : String := x.toForm.toString
+instance : ToString Form := ⟨Form.toString⟩
 
 
 instance : ToString Sequent where
-  toString xseq :=
-  match xseq with
-  | .seq Γ Δ => String.intercalate ", " (List.map formToString (Multiset.sort Γ LE.le ))
-    ++ " ⊢ " ++ String.intercalate ", " (List.map formToString (Multiset.sort Δ LE.le ))
+  toString seq :=
+  String.intercalate ", " ((Multiset.sort seq.Γ LE.le ).map Form.toString )
+    ++ " ⊢ " ++ String.intercalate ", " ((Multiset.sort seq.Δ LE.le ).map Form.toString )
 
-instance : ToString Seq4Proof where
+instance : ToString Seq4proof where
   toString seq4 :=
-  match seq4 with
-  | .seq4 as forms₁ imps₁ aimps bs forms₂ imps₂ =>
-  (List.map toString as).toString ++ (List.map formToString forms₁).toString ++ (List.map formToString imps₁).toString ++ (List.map formToString aimps).toString
-  ++ "⊢" ++ (List.map toString bs).toString  ++ (List.map formToString forms₂).toString ++ (List.map formToString imps₂).toString
+  (seq4.as.map toString ).toString ++ (seq4.fL.map Form.toString ).toString ++ (seq4.aimp.map aImp.toString ).toString
+  ++ "⊢" ++ (seq4.bs.map toString).toString  ++ (seq4.fR.map Form.toString).toString ++ (seq4.impR.map Imp.toString ).toString
 
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
@@ -94,6 +40,6 @@ def horizontalLine (n : Nat) : String :=
   String.join (List.replicate n "-")
 
 def listToString (xs : List Form) : String :=
-  String.intercalate ", " (xs.map formToString)
+  String.intercalate ", " (xs.map Form.toString)
 
 end multiSucc

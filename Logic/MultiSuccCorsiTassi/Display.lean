@@ -1,5 +1,6 @@
 import Mathlib.Data.Multiset.Sort
 import Mathlib.Data.List.Lex
+import Mathlib.Data.Finset.Sort
 
 import Logic.MultiSuccCorsiTassi.Core
 import Logic.MultiSuccCorsiTassi.Kripke
@@ -45,30 +46,30 @@ instance : ToString Seq4Proof where
 
 instance : ToString World where
   toString world :=
-  String.intercalate ", " (world.forced.map toString)
-    ++ " ⊢ " ++ String.intercalate ", " (world.unforced.map toString)
+  String.intercalate ", " (world.forced.sort.map toString)
+    ++ " ⊢ " ++ String.intercalate ", " (world.unforced.sort.map toString)
 
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
 
-def cmToString : CM → String
+def mToString : Model → String
 | ⟨w, []⟩ => toString w
 | ⟨w, bs⟩ =>
-  let bstrs := bs.map cmToString
+  let bstrs := bs.map mToString
   toString w ++ "\n " ++ indent 0 (String.intercalate "  |  " bstrs)
-/- partial def cmToString (cm : CM) (indent : String := "") : String :=
-  let worldStr := toString cm.world
-  match cm.branch with
+/- partial def mToString (m : Model) (indent : String := "") : String :=
+  let worldStr := toString m.world
+  match m.branch with
   | [] => indent ++ worldStr
   | branches =>
     let branchStrs := branches.map (fun child =>
-      cmToString child (indent ++ "| ")
+      mToString child (indent ++ "| ")
     )
     indent ++ worldStr ++ "\n" ++ (String.intercalate "\n" branchStrs) -/
---termiantion_by cm.depth
+--termiantion_by m.depth
 
-instance : ToString CM where
-  toString cm := cmToString cm
+instance : ToString Model where
+  toString m := mToString m
 
 instance : ToString TV where
   toString tv :=

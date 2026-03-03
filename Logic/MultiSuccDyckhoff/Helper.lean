@@ -57,16 +57,16 @@ instance formWeightWellFoundedRelation : WellFoundedRelation Form where
 
  -/
 def Sequent.size : Sequent → Multiset Nat
-  | .seq Δ Γ => (Δ.map Form.weight) + (Γ.map Form.weight)
+  | {Δ, Γ} => (Δ.map Form.weight) + (Γ.map Form.weight)
 
 /-
 This is used as the second argument of a lexicographic order,
 to show termination for the 2 cases where we move imps to imps list and atom to atoms list.
 So the original forms list carries more wight than the distributed lists.
  -/
-def Seq4Proof.size (s : Seq4Proof) : Nat :=
-  match s with
-  | .seq4 _ forms₁ imps₁ _ _ forms₂ imps₂ =>  (weight_sum_increased forms₁) + (weight_sum imps₁) + (weight_sum_increased forms₂) + (weight_sum imps₂)
+def Seq4Proof.size (s : Seq4proof) : Nat :=
+(weight_sum_increased s.fL) + (weight_sum (s.aimp.map aImp.toForm)) +
+(weight_sum_increased s.fR) + (weight_sum (s.impR.map Imp.toForm))
 
 /-
 The Multiset Ordering. Based on Form.weight multisets

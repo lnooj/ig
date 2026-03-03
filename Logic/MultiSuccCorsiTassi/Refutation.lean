@@ -9,7 +9,7 @@ open multiSucc
 
 -- all multi premise rules for proofs now need only one for refutation
 -- give hist as well
-inductive Refutation : List Imp → Sequent → Type
+inductive Refutation : (hs : List Imp) → Sequent → Type
   -- ∀ x Γ,  Γ ⊬ Δ
   | ax :
     ∀ (xs ys: List Form), --should be list of atoms?
@@ -66,7 +66,7 @@ inductive Refutation : List Imp → Sequent → Type
     ∀ (a b : Form) (xs ys : List Form),
       Refutation hs ⟨↑((a ⊃ b) :: xs), ↑(a :: ys)⟩ →
       Refutation hs ⟨↑((a ⊃ b) :: xs), ↑ys⟩
-  --  a ⊃ b ∈ hs → (Γ ⊬ b, Δ) → (Γ ⊬ a ⊃ b, Δ) TÄRNIGA IMP
+  --  a ⊃ b ∈ hs → (Γ ⊬ b, Δ) → (Γ ⊬ a ⊃ b, Δ)
   | afort :
     ∀ (a b : Form) (xs ys : List Form),
       (hhs : ⟨a, b⟩ ∈ hs) → --or (hhs : a ∈ hs.map .left) →
