@@ -40,7 +40,7 @@ macro_rules
     | s       => Lean.Macro.throwError s!"Unknown atom name: {s}"
 | `(mult { $[$fs:form],* }) => `(Multiset.ofList [ $[form {$fs}],* ])
 | `(seq { $Γ:multiset ⊢ $Δ:multiset }) =>
-      `(Sequent.seq (mult {$Γ}) (mult {$Δ}))
+      `(Sequent.mk (mult {$Γ}) (mult {$Δ}))
 | `(form {($a → $b)} ) => `(Form.imp form {$a} form {$b})
 | `(form {($a ∧ $b)} ) => `(Form.and form {$a} form {$b})
 | `(form {($a ∨ $b)} ) => `(Form.or form {$a} form {$b})
