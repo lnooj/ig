@@ -61,19 +61,20 @@ theorem proof_correctness :
     simp_all
     rcases impF with ⟨m', hm_mem, ⟨ha, hb⟩⟩
     . use m'
-      have aaaa := model_all_mono_list wf hm_mem h₁
+      have monoList : ∀ x ∈ xs, x.eval m' = TV.t := by grind [Model.mono_all_true]
       simp_all
-      apply wf_of_mem_all wf hm_mem
+      apply Model.all_wf wf hm_mem
 
   | impl a b xs ys prem1 prem2 ih₁ ih₂ =>
     simp_all
     intro h₁ h₂
-    have impT := eval_imp_true_then h₁
-    simp at impT
-    cases impT with
+    have impT := h₁
+    rw [eval_imp_true_iff] at h₁
+    simp at h₁
+    cases h₁ with
     | intro himp hbranch =>
       cases himp with
-      | inl h => exact Set.inter_nonempty.mp (ih₁ m wf h₁ h₂ h)
+      | inl h => exact Set.inter_nonempty.mp (ih₁ m wf impT h₂ h)
       | inr h => simp_all
 
   | afort a b xs ys prem ih =>
@@ -81,6 +82,6 @@ theorem proof_correctness :
     intro h₁ h₂
     specialize ih m wf h₁
     apply_assumption
-    apply eval_imp_false_then_b_false h₂ wf
+    apply imp_false_then_b_false h₂ wf
 
 #print axioms proof_correctness
