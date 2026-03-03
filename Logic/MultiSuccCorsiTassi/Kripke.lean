@@ -145,13 +145,13 @@ def Form.eval : Form → Model → TV
 | .or a b, m => disjTV (a.eval m) (b.eval m )
 | .imp a b, m =>
   if (a.eval m = .f ∨ b.eval m = .t)
-      ∧ (m.branch.all (λ m' => (a ⊃ b).eval m' = .t)) then .t
+      ∧ (m.branch.attach.all (λ m' => (a ⊃ b).eval m'.val = .t)) then .t
   else if (a.eval m = .t ∧ b.eval m = .f)
-      ∨ (m.branch.any (λ m' => (a ⊃ b).eval m' = .f)) then .f --only one false
+      ∨ (m.branch.attach.any (λ m' => (a ⊃ b).eval m'.val = .f)) then .f --only one false
   else .u
 termination_by fm m => (sizeOf_Form fm, m.depth)
 decreasing_by
-all_goals first | (apply Prod.Lex.left; grind) | (apply Prod.Lex.right; apply depth_lt_of_mem; sorry)
+all_goals first | (apply Prod.Lex.left; grind) | (apply Prod.Lex.right; apply depth_lt_of_mem; grind)
 
 @[grind, simp]
 def impTrueCond (a b : Form) (m : Model) : Prop :=
@@ -351,15 +351,13 @@ theorem eval_imp_true_orr {a b : Form} :
   rw [Form.eval]; simp_all
 
 -- IN USE
-@[grind ., simp]
+--@[grind ., simp]
 theorem eval_imp_true_then (h₁ : (a ⊃ b).eval m = .t) :
   (a.eval m = .f ∨ b.eval m = .t)
-      ∧ (m.branch.all (λ m' => (a ⊃ b).eval m' = .t)) := by grind [Form.eval]
+      ∧ (m.branch.all (λ m' => (a ⊃ b).eval m' = .t)) := by
+  rw [Form.eval] at h₁; simp_all; grind [Form.eval]
 
---@[grind ., simp]
-theorem eval_imp_false_if {a b : Form} :
-(a.eval m = .t ∧  b.eval m = .f ∨ ∃ x ∈ m.branch, ((a ⊃ b).eval x = TV.f)) →
-  (a ⊃ b).eval m = TV.f := by grind [Form.eval]
+
 
 --@[grind ., simp]
 theorem eval_imp_false_then :
@@ -369,6 +367,15 @@ theorem eval_imp_false_then :
     simp_all
     apply eval_if_else_false at h
     exact h
+
+--@[grind ., simp]
+theorem eval_imp_false_if {a b : Form} {m : Model}
+(h : (a.eval m = .t ∧  b.eval m = .f) ∨ (∃ x ∈ m.branch, ((a ⊃ b).eval x = TV.f))) :
+  (a ⊃ b).eval m = TV.f := by
+  rw [Form.eval];
+  simp_all
+  grind
+
 
 -- IN USE
 theorem eval_imp_righ_wo_ys :
@@ -490,6 +497,7 @@ theorem model_all_mono {f : Form} {m m' : Model}
     apply model_all_mono awf h₂ aT
 termination_by (m.depth)
 decreasing_by exact depth_lt_of_mem h₁
+
 
 -- IN USE
 @[grind ., simp]

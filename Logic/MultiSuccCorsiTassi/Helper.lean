@@ -59,12 +59,11 @@ instance instLT (cap : ℕ) : LT (Weight cap) where
 instance instWellFoundedRelation {cap : ℕ} : WellFoundedRelation (Weight cap) where
   rel a b := a < b
   wf := by
-    simp only [instLT]
     let rel' : WellFoundedRelation (Weight cap) :=
       invImage (fun x ↦ ⟨cap - x.r, x.n⟩) Prod.instWellFoundedRelation
     convert rel'.wf with a b
     simp only [WellFoundedRelation.rel, rel']
-    grind [InvImage, Nat.lt_wfRel, sizeOf_nat]
+    grind [instLT, InvImage, Nat.lt_wfRel, sizeOf_nat]
 
 
 end Weight
@@ -144,8 +143,6 @@ def findIntersection : List Atom → List Atom → List Atom
         findIntersection xs ys
       else y :: findIntersection xs ys
     else findIntersection xs ys
-
-#eval findIntersection [Atom.mk 1] [Atom.mk 1, Atom.mk 2, Atom.mk 1]
 
 
 theorem mem_findIntersection_iff (x : Atom) :

@@ -81,6 +81,6 @@ theorem proof_correctness :
     intro h₁ h₂
     specialize ih m wf h₁
     apply_assumption
-    apply eval_imp_false_then_b_false h₂
+    apply eval_imp_false_then_b_false h₂ wf
 
 #print axioms proof_correctness
