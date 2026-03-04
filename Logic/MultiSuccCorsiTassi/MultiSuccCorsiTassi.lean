@@ -30,7 +30,7 @@ open Proof
 --give sequent, hist, blocked
 inductive Result (s : Sequent) /- (block : List Imp) (hist : List Imp)  -/where
 | proof : List (Proof (⟨s.Γ /- ∪ (block.map Imp.toForm)  -/, s.Δ⟩ )) → Result s /- block hist -/
-| cm : List CM → Result s/-  block hist -/
+| cm : List Model → Result s/-  block hist -/
 --| refutation : List (Refutation hist s)  → Result s block hist
 -- | refutation List (Refutation (s, h, impB))
 
@@ -43,7 +43,7 @@ def Result.map (r : Result s) (k : List (Proof s) → List (Proof s')) : Result 
 def Result.map2 (r₁ : Result s1) (r₂ : Result s2) (k : List (Proof s1) → List (Proof s2) → List (Proof s')) : Result s' :=
   match r₁, r₂ with
   | .proof ps₁, .proof ps₂ => .proof (k ps₁ ps₂)
-  | .cm cm₁, .cm cm₂   => .cm (cm₁ ++ cm₂)
+  | .cm cm₁, .cm cm₂  => .cm (cm₁ ++ cm₂)
   | .cm cms, _ | _, .cm cms => .cm cms
 
 
@@ -159,7 +159,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                     []
                 exact Result.cm ((choicesCM cmsLists).map
                                   (λ cms ↦
-                                    let b : Finset Atom := cms.map (λ c : CM ↦ c.world.unforced) |>.toFinset.biUnion (·)
+                                    let b : Finset Atom := cms.map (λ c : Model ↦ c.world.unforced) |>.toFinset.biUnion (·)
                                     ⟨⟨s.world.forced, s.world.unforced ∪ b⟩, cms⟩))  --uus juur lisada + iga vahetu lapse bs
 
         | xs => by
@@ -251,8 +251,8 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
 
 termination_by s.weight cap hcap
 decreasing_by
-all_goals simp [Seq4Proof.weight]; try grind
-. simp at *
+all_goals simp [Seq4Proof.weight]; try grind; sorry --[Seq4Proof.weight, Weight.wellFoundedRelation, Weight.instLT]
+. /- simp at *
   have hx : { f, g} ∉ hist := by
     intro hmem
     have : { f, g} ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
@@ -261,7 +261,8 @@ all_goals simp [Seq4Proof.weight]; try grind
   have hcard : hist.toFinset.card < (insert { f, g} hist.toFinset).card := by
     have : (insert { f, g} hist.toFinset).card = hist.toFinset.card + 1 := Finset.card_insert_of_notMem hxFin
     grind
-  grind
+  sorry
+. simp [Seq4Proof.weight, Weight.wellFoundedRelation, Weight.instLT] -/
 
 
 

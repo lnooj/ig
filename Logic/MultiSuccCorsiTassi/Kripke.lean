@@ -8,7 +8,7 @@ open multiSucc
 structure World where
   forced : Finset Atom
   unforced : Finset Atom
-  -- prop : Disjoint forced unforced
+ -- prop : Disjoint forced unforced
 deriving DecidableEq
 --TODO PROOF OF MONOTONICITY. FORCED STAY FORCED. u is if c isnt in any.
 -- unforced vastupidi
@@ -17,7 +17,7 @@ def Seq4Proof.forced (s : Seq4Proof) : Finset Atom := s.as.toFinset
 
 def Seq4Proof.unforced (s : Seq4Proof) : Finset Atom := s.bs.toFinset
 
-def Seq4Proof.world (p : Seq4Proof) : World := ⟨p.forced, p.unforced ⟩ -- , Finset.disjoint_sdiff⟩
+def Seq4Proof.world (p : Seq4Proof) : World := ⟨p.forced, p.unforced⟩ -- , Finset.disjoint_sdiff⟩
 
 -- attribute [grind .] World.prop
 

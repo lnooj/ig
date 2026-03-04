@@ -56,6 +56,7 @@ namespace Weight
 instance instLT (cap : ℕ) : LT (Weight cap) where
   lt a b := a.r > b.r ∨ a.r = b.r ∧ a.n < b.n
 
+@[simp, grind]
 instance instWellFoundedRelation {cap : ℕ} : WellFoundedRelation (Weight cap) where
   rel a b := a < b
   wf := by
