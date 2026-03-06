@@ -75,7 +75,7 @@ inductive Refutation : Sequent → (hs : List Imp) → Type
 
 def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refutation xseq h → String
 | .ax h as bs ys _ =>
-  indent indentLvl s!"AX: {listToString (as.map Form.atoms) ++ listToString (ys.map Imp.toForm)} ⊬ {listToString (bs.map Form.atoms)}"
+  indent indentLvl s!"AX: {listToString (as.map Form.atoms)}, {String.intercalate ", " (ys.map Imp.toStringBlocked)} ⊬ {listToString (bs.map Form.atoms)}"
 | .botr h xs ys proof =>
   let premise := refutationToString (indentLvl + 1) proof
   let ruleLine :=
@@ -107,11 +107,11 @@ def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refu
   s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impl₁ h a b xs ys proof =>
   let premise  := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→L: ({a} → {b}), {listToString xs}⊬ {listToString ys}"
+  let ruleLine := s!"→L: {a} → {b}, {listToString xs}⊬ {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impl₂ h a b xs ys proof =>
   let premise  := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→L: ({a} → {b}), {listToString xs}⊬ {listToString ys}"
+  let ruleLine := s!"→L: {a} → {b}, {listToString xs}⊬ {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impr h a b as bs xs ys _ proof  =>
   let premise := refutationToString (indentLvl + 1) proof
