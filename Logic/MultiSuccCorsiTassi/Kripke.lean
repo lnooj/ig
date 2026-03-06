@@ -474,3 +474,5 @@ theorem imp_false_then_b_false  (impF : (a ⊃ b).eval m = TV.f) (wf : m.wf) : b
   | inr h =>
     rcases h with ⟨m', mem, h₂⟩
     exact imp_false_branch mem h₂ wf
+
+end multiSucc

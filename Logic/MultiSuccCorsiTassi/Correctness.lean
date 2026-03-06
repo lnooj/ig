@@ -10,8 +10,6 @@ namespace multiSucc
 open multiSucc
 
 theorem Model_ertyu : ∀ m : Model, m.world.forced ∩ m.world.unforced = ∅ := by sorry
-theorem Model_true_in_future : ∀ (m : Model), m.world.forced ∈ m.branch.map (λ child ↦ child.world.forced) := by sorry
-
 
 /-- If a sequent gets  countermodels as results, each of those models must refute the sequent  -/
 /- theorem Model_correctness :

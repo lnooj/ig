@@ -26,36 +26,96 @@ open multiSucc
 
 --deriving Repr
 open Proof
+open Refutation
 
 --give sequent, hist, blocked
-inductive Result (s : Sequent) /- (block : List Imp) (hist : List Imp)  -/where
-| proof : List (Proof (⟨s.Γ /- ∪ (block.map Imp.toForm)  -/, s.Δ⟩ )) → Result s /- block hist -/
-| cm : List Model → Result s/-  block hist -/
---| refutation : List (Refutation hist s)  → Result s block hist
+inductive Result (s : Sequent) /- (block : List Imp)-/ (hs : List Imp)  where
+| proof : List (Proof (⟨s.Γ /- ∪ (block.map Imp.toForm)  -/, s.Δ⟩ )) → Result s hs /- block hist -/
+--| cm : List Model → Result s/-  block hist -/
+| refutation : List (Refutation s hs)  → Result s hs
 -- | refutation List (Refutation (s, h, impB))
 
+def Result.proofs : Result s h → List (Proof s)
+| .proof pf => pf
+| _ => []
 
-def Result.map (r : Result s) (k : List (Proof s) → List (Proof s')) : Result s' :=
+def Result.refutations : Result s h → List (Refutation s h)
+| .refutation rs => rs
+| _ => []
+
+def Result.refutationss : List (Result s h) → List (Refutation s h)
+| r :: rs =>
   match r with
-  | .proof ps => .proof (k ps)
-  | .cm cms   => .cm cms
+  | .refutation rfs => rfs ++ Result.refutationss rs
+  | _ =>  Result.refutationss rs
+| [] => []
 
-def Result.map2 (r₁ : Result s1) (r₂ : Result s2) (k : List (Proof s1) → List (Proof s2) → List (Proof s')) : Result s' :=
-  match r₁, r₂ with
-  | .proof ps₁, .proof ps₂ => .proof (k ps₁ ps₂)
-  | .cm cm₁, .cm cm₂  => .cm (cm₁ ++ cm₂)
-  | .cm cms, _ | _, .cm cms => .cm cms
+def Result.proofss : List (Result s h) → List (Proof s)
+| r :: rs =>
+  match r with
+  | .proof pf => pf ++ Result.proofss rs
+  | _ => Result.proofss rs
+| [] => []
 
+def Proof.castSeq (x : Proof ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩)
+    (ha : Multiset.ofList a₁ = Multiset.ofList a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
+    (hb : Multiset.ofList b₁ = Multiset.ofList b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
+    Proof ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩ := by rw [ha, hb] at x; exact x
 
 def Proof.castSeqList (x : List (Proof ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩))
     (ha : Multiset.ofList a₁ = Multiset.ofList a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
     (hb : Multiset.ofList b₁ = Multiset.ofList b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
     List (Proof ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩) := by rw [ha, hb] at x; exact x
 
-def Result.castSeq (x : Result ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩)
+def Refutation.castSeqList (x : List (Refutation ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩ h))
+    (ha : Multiset.ofList a₁ = Multiset.ofList a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
+    (hb : Multiset.ofList b₁ = Multiset.ofList b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
+    List (Refutation ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩ h) := by rw [ha, hb] at x; exact x
+
+def Result.castSeq (x : Result ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩ hist)
   (ha : Multiset.ofList a₁ = Multiset.ofList a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
   (hb : Multiset.ofList b₁ = Multiset.ofList b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
-  Result ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩ := by rw [ha, hb] at x; exact x
+  Result ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩ hist := by rw [ha, hb] at x; exact x
+
+def Result.map' (r : Result s h)
+  (f₁ : List (Proof s) → List (Proof s'))
+  (f₂ : List (Refutation s h) → List (Refutation s' h')): Result s' h':=
+  match r with
+  | .proof ps => .proof (f₁ ps)
+  | .refutation rs   => .refutation (f₂ rs)
+
+def Result.map (r : Result  ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩ h)
+  (f₁ : Proof  ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩ → Proof ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩)
+  (f₂ : Refutation  ⟨Multiset.ofList a₁, Multiset.ofList b₁⟩ h → Refutation ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩ h') :
+  Result ⟨Multiset.ofList a₂, Multiset.ofList b₂⟩ h' :=
+  r.map' (λ pf ↦ by
+          let res := (Proof.castSeqList pf).map f₁
+          exact Proof.castSeqList res)
+        (λ rs ↦ by
+          let res := (Refutation.castSeqList rs).map f₂
+          exact Refutation.castSeqList res
+            )
+
+def Result.map2proof (r₁ : Result s1 h1) (r₂ : Result s2 h2)
+  (fproof : List (Proof s1) → List (Proof s2) → List (Proof s'))
+  (ref₁ : List (Refutation s1 h1) → List (Refutation s' h'))
+  (ref₂ : List (Refutation s2 h2) → List (Refutation s' h')): Result s' h':=
+  match r₁, r₂ with
+  | .proof ps₁, .proof ps₂ => .proof (fproof ps₁ ps₂)
+  | .refutation rs₁, .refutation rs₂  => .refutation ( ref₁ rs₁ ++ ref₂ rs₂)
+  | .refutation rs, _ => .refutation (ref₁ rs)
+  | _, .refutation rs => .refutation (ref₂ rs)
+/-
+have mmm := --premise.map ruleP ruleR
+          premise.map
+                (λ pf ↦ by
+                  let res := (Proof.castSeqList pf).map ruleP
+                  exact Proof.castSeqList res)
+                (λ rs ↦ by
+                  let res := (Refutation.castSeqList rs).map ruleR
+                  exact Refutation.castSeqList res
+                    )
+                     -/
 
 
 -- [[1,2] [3] [4,5]] = [[1,3,4] [1,3,5] [2,3,4] [2,3,5]]
@@ -66,18 +126,13 @@ def choicesCM : List (List CM) → List (List CM)
     (choicesCM xss).map (fun ys => x :: ys) ++
     choicesCM (xs :: xss)
 
-def pickproof : List (Result r) → List (Result r)
+/-- Picks only proofs if any, else returns []  -/
+def pickproof : List (Result s h) → List (Result s h)
 | rs =>
-  let proofs := rs.filter (fun
+  rs.filter (fun
     | Result.proof _ => true
     | _ => false)
 
-  if proofs.isEmpty then
-    rs.filter (fun
-      | Result.cm _ => true
-      | _ => false)
-  else
-    proofs
 
 
 
@@ -101,115 +156,107 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 def automatedProof (s : Seq4Proof) (cap : ℕ )
                   (hcap : s.cap.card ≤ cap := by simp at *; grind )
                   (metaR1 : s.impR ∩ s.hist = ∅ := by grw [metaR1]) :
-                   Result s.toSeq :=
+                   Result s.toSeq s.hist:=
   match s with
   | {as, fL, block,  bs, fR, impR, hist} =>
     match fL with
     | [] =>
       match fR with
       | [] => -- succedent only has atoms left --
-        match common : findIntersection as bs with
+        match common : as ∩ bs with --CHANGED
         -- no common atoms
         | [] =>
           match impR with
-          | [] => dbg_trace "everything empt; {as} {bs} {s.world}"; Result.cm [⟨s.world, []⟩]
-          | impR => --METARULE 1 NONINVERTABLE REEGEL
-            let impRApplications : List (Result ⟨↑(as.map Form.atoms ++ block.map Imp.toForm), ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩) :=
+          | [] =>  by
+            simp [Seq4Proof.toSeq, List.append_nil]
+            have rule := [ax hist as bs block (by grind)]
+            exact Result.refutation rule
+          --METARULE 1 NONINVERTABLE REEGEL
+          | impR => by
+            simp only [Seq4Proof.toSeq, List.append_nil]
+            let impRApplications : List (Result ⟨↑(as.map Form.atoms ++ block.map Imp.toForm), ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩ hist) :=
               impR.attach.map (λ (⟨⟨f, g⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦ by
 
-                  have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆   impR.toFinset.biUnion collectImpsImp := by
-                    intro x hx
-                    apply Finset.mem_biUnion.mpr
-                    refine ⟨⟨f,g⟩, by simpa using ha, ?_⟩
-                    simp [collectImpsImp] at hx ⊢
-                    exact hx
+                have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆   impR.toFinset.biUnion collectImpsImp := by
+                  intro x hx
+                  apply Finset.mem_biUnion.mpr
+                  refine ⟨⟨f,g⟩, by simpa using ha, ?_⟩
+                  simp [collectImpsImp] at hx ⊢
+                  exact hx
+                have eq : block.toFinset.biUnion collectImpsImp = (block.map Imp.toForm ).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
 
-                  have eq : block.toFinset.biUnion collectImpsImp = (block.map Imp.toForm ).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
+                have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind) (by simp)
+                let xs := as.map Form.atoms ++ block.map Imp.toForm; let ys := bs.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
+                have ruleP := (impr f g xs ys)
+                have ruleR := (impr hist f g as bs block (impR.erase ⟨f, g⟩) (by grind))
 
-                  have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind) (by simp)
-                  let rule := (impr f g (as.map Form.atoms ++ block.map Imp.toForm) (bs.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm))
-
-                  simp only [Seq4Proof.toSeq] at premise rule ⊢
-                  exact premise.map fun pf =>
-                    let res := (Proof.castSeqList pf).map rule
-                    Proof.castSeqList res
-                  )
+                simp at premise
+                have mmm := --premise.map ruleP ruleR
+                  premise.map'
+                  (λ pf ↦ Proof.castSeqList ((Proof.castSeqList pf).map ruleP))
+                  (λ rs ↦ Refutation.castSeqList ((Refutation.castSeqList rs).map ruleR))
+                have erase :  Multiset.ofList ((f ⊃ g) :: (List.map Form.atoms bs ++ List.map Imp.toForm (impR.erase { f := f, g := g }))) =
+                              Multiset.ofList (List.map Form.atoms bs ++ List.map Imp.toForm impR) := by simp; grind
+                rw [erase] at mmm; exact mmm
+              )
             have res := pickproof impRApplications
-            match res with
-            | [] => Result.cm [⟨s.world, []⟩]
-            | x::xs => by
-              simp only [Seq4Proof.toSeq, List.append_nil]
-              match x with
-              | .proof pf =>
-                exact (Result.proof <|
-                  res.foldr
-                    (fun r acc =>
-                      match r with
-                      | Result.proof ps => ps ++ acc
-                      | _ => acc)
-                    [])
-              | .cm cms =>
-                -- res contains only cm results
-                let cmsLists :=
-                  res.foldr
-                    (fun r acc =>
-                      match r with
-                      | Result.cm cs => cs :: acc
-                      | _ => acc)
-                    []
-                exact Result.cm ((choicesCM cmsLists).map
-                                  (λ cms ↦
-                                    let b : Finset Atom := cms.map (λ c : Model ↦ c.world.unforced) |>.toFinset.biUnion (·)
-                                    ⟨⟨s.world.forced, s.world.unforced ∪ b⟩, cms⟩))  --uus juur lisada + iga vahetu lapse bs
+            if res ≠ [] then
+              exact Result.proof <| (Result.proofss res)
+            else -- res contains only cm results
+
+              exact dbg_trace s!"res:{impRApplications.length},{( Result.refutationss impRApplications).length}, {( Result.proofss impRApplications).length}";Result.refutation <| (Result.refutationss impRApplications)
 
         | xs => by
-          have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
-          have corr := findIntersCorr as bs
+          --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
+          --have corr := findIntersCorr as bs
           have proofs := xs.attach.map (λ ⟨x, hx⟩ ↦
-                        ax ( x) ((as.map Form.atoms) ++ (block.map Imp.toForm)) ((bs.map Form.atoms) ++ (impR.map Imp.toForm))
-                        (by simp [hx, Γ, corr])
-                        (by simp [hx, Γ, corr]))
+                        ax x ((as.map Form.atoms) ++ (block.map Imp.toForm)) ((bs.map Form.atoms) ++ (impR.map Imp.toForm))
+                        (by grind)
+                        (by grind))
           simp only [Seq4Proof.toSeq, List.append_nil]; exact Result.proof proofs
 
       -- open up forms on right side
       | (.atoms a) :: succForms =>  --move atom to succ atoms list
         Result.castSeq (automatedProof ⟨as, [], block, a :: bs, succForms, impR, hist⟩ cap)
 
-      | ⊥ :: succForms =>   --botr rule, .bot is ignored
+      | ⊥ :: succForms => by  --botr rule, .bot is ignored
         have premise := automatedProof ⟨as, [], block, bs, succForms, impR, hist⟩ cap
-        premise.map fun pf => by
-          simp only [Seq4Proof.toSeq, List.append_nil] at pf ⊢
-          have rule := pf.map (botr ((as.map .atoms)++ (block.map Imp.toForm)) (bs.map .atoms ++ succForms ++ (impR.map Imp.toForm)))
-          exact Proof.castSeqList rule
+        simp only [Seq4Proof.toSeq, List.append_nil] at premise ⊢
+        let xs := (as.map .atoms) ++ (block.map Imp.toForm); let ys := (bs.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
+        have ruleP := botr xs ys; have ruleR := botr hist xs ys
+        have mmm := --premise.map ruleP ruleR
+          premise.map'
+                (λ pf ↦ Proof.castSeqList ((Proof.castSeqList pf ).map ruleP))
+                (λ rs ↦ Refutation.castSeqList ((Refutation.castSeqList rs).map ruleR))
+        exact Result.castSeq mmm
 
       | (.and a b) :: succForms =>
         have premise₁ := automatedProof ⟨as, [], block, bs, a :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
         have premise₂ := automatedProof ⟨as, [], block, bs, b :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-
-        Result.map2 premise₁ premise₂ fun pf₁ pf₂ => by
-          simp only [Seq4Proof.toSeq, List.append_nil] at pf₁ pf₂ ⊢
-          have rule := (getPairs
-                        (Proof.castSeqList pf₁ (by rfl))
-                        (Proof.castSeqList pf₂ (by rfl))).map
-                          (andr a b ((as.map .atoms) ++ (block.map Imp.toForm)) (bs.map .atoms ++ succForms ++ (impR.map Imp.toForm))).uncurry
-          exact Proof.castSeqList rule
+        let xs := (as.map .atoms) ++ (block.map Imp.toForm); let ys := (bs.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
+        Result.map2proof premise₁ premise₂
+          (λ pf₁ pf₂ ↦
+          have rule := (getPairs (Proof.castSeqList pf₁) (Proof.castSeqList pf₂ )).map (andr a b xs ys).uncurry
+          Proof.castSeqList rule)
+          (λ rs₁ ↦ Refutation.castSeqList ((Refutation.castSeqList rs₁).map (andr₁ hist a b xs ys)))
+          (λ rs₂ ↦ Refutation.castSeqList ((Refutation.castSeqList rs₂).map (andr₂ hist a b xs ys)))
 
       | (.or a b) :: succForms =>
         have premise := automatedProof ⟨as, [], block, bs, a :: b :: succForms, impR, hist⟩ cap
-        premise.map fun pf => by
-          simp only [Seq4Proof.toSeq, List.append_nil] at pf ⊢
-          have rule := (Proof.castSeqList pf (by rfl)).map
-                          (orr a b ((as.map .atoms) ++ (block.map Imp.toForm)) (bs.map .atoms ++ succForms ++ (impR.map Imp.toForm)))
-          exact Proof.castSeqList rule
+        let xs := (as.map .atoms) ++ (block.map Imp.toForm); let ys := (bs.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
+        have ruleP := (orr a b xs ys); have ruleR := orr hist a b xs ys
+        premise.map'
+          (λ pf ↦ Proof.castSeqList ((Proof.castSeqList pf).map ruleP))
+          (λ rs ↦ Refutation.castSeqList ((Refutation.castSeqList rs).map ruleR))
 
       | (.imp a b) :: succForms =>  --METARULE 2 apply afort only when R→ has been used (if it is in usedImps₂. else: läheb imps listi)
         if inc : ⟨a,b⟩ ∈ hist then
           have premise := automatedProof ⟨as, [], block, bs, b :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-          premise.map fun pf => by
-            simp only [Seq4Proof.toSeq, List.append_nil] at pf ⊢
-            have rule := (Proof.castSeqList pf (by rfl)).map
-                            (afort a b (as.map .atoms ++ block.map Imp.toForm) (bs.map .atoms ++ succForms ++ (impR.map Imp.toForm)))
-            exact Proof.castSeqList rule
+          let xs := (as.map .atoms) ++ (block.map Imp.toForm); let ys := (bs.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
+          have ruleP := afort a b xs ys; have ruleR := afort hist a b xs ys (by grind)
+          premise.map'
+            (λ pf ↦ Proof.castSeqList ((Proof.castSeqList pf).map ruleP))
+            (λ rs ↦ Refutation.castSeqList ((Refutation.castSeqList rs).map ruleR))
         else
           .castSeq (automatedProof ⟨as, [], block, bs, succForms, ⟨a,b⟩ :: impR, hist⟩ cap
                             (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind) (by simp at metaR1; simp; grind))
@@ -218,6 +265,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
     -- open up forms on left side --
     | (.atoms a) :: antForms =>
       .castSeq (automatedProof ⟨as ++ [a], antForms, block, bs, fR, impR, hist⟩ cap)
+
     | .bot :: antForms => by
       have rule := [botl (as.map .atoms ++ antForms ++ (block.map Imp.toForm)) ((bs.map .atoms) ++ fR ++ (impR.map Imp.toForm))]
       simp only [Seq4Proof.toSeq]
@@ -225,34 +273,55 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
 
     | (.and a b) :: antForms =>
       have premise := automatedProof ⟨as, a :: b :: antForms, block, bs, fR, impR, hist⟩ cap
-      premise.map fun pf => by
-        simp only [Seq4Proof.toSeq] at pf; simp only [Seq4Proof.toSeq]
-        have rule := (Proof.castSeqList pf).map
-                      (andl a b ((as.map .atoms) ++ antForms ++ (block.map Imp.toForm)) ((bs.map .atoms) ++ fR ++ (impR.map Imp.toForm)))
-        apply Proof.castSeqList rule
+      let xs := (as.map .atoms) ++ antForms ++ (block.map Imp.toForm); let ys := (bs.map .atoms) ++ fR ++ (impR.map Imp.toForm)
+      have ruleP := (andl a b xs ys); have ruleR := (Refutation.andl hist a b xs ys)
+      premise.map'
+        (λ pf ↦ Proof.castSeqList ((Proof.castSeqList pf).map ruleP))
+        (λ rs ↦ Refutation.castSeqList ((Refutation.castSeqList rs).map ruleR))
 
     | (.or a b) :: antForms =>
       have premise₁ := automatedProof ⟨as, a :: antForms, block, bs, fR, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
       have premise₂ := automatedProof ⟨as, b :: antForms, block, bs, fR, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-      Result.map2 premise₁ premise₂ fun pf₁ pf₂ => by
-        simp only [Seq4Proof.toSeq] at pf₁ pf₂ ⊢
-        have h := (getPairs (Proof.castSeqList pf₁) (Proof.castSeqList pf₂)).map
-                    (orl a b (as.map .atoms ++ antForms ++ (block.map Imp.toForm)) ((bs.map .atoms) ++ fR ++ (impR.map Imp.toForm))).uncurry
-        exact Proof.castSeqList h
+      let xs := (as.map .atoms) ++ antForms ++ (block.map Imp.toForm); let ys := (bs.map .atoms) ++ fR ++ (impR.map Imp.toForm)
+      Result.map2proof premise₁ premise₂
+          (λ pf₁ pf₂ ↦ by
+          have rule := (getPairs (Proof.castSeqList pf₁) (Proof.castSeqList pf₂ )).map
+                          (orl a b xs ys).uncurry
+          exact Proof.castSeqList rule)
+          (λ rs₁ ↦ Refutation.castSeqList ((Refutation.castSeqList rs₁).map ((Refutation.orl₁ hist a b xs ys))))
+          (λ rs₂ ↦ Refutation.castSeqList ((Refutation.castSeqList rs₂).map ((Refutation.orl₂ hist a b xs ys))))
 
     | (.imp a b) :: antForms =>
       have premise₁ := automatedProof ⟨as, antForms, ⟨a, b⟩ :: block, bs, a::fR, impR, hist⟩ cap
       have premise₂ := automatedProof ⟨as, b::antForms, block, bs, fR, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-      Result.map2 premise₁ premise₂ fun pf₁ pf₂ => by
-        simp only [Seq4Proof.toSeq] at pf₁ pf₂ ⊢
-        have h := List.map (impl a b (as.map .atoms ++ antForms ++ (block.map Imp.toForm)) (bs.map .atoms ++ fR ++ (impR.map Imp.toForm))).uncurry
-                  (getPairs (Proof.castSeqList pf₁ ) (Proof.castSeqList pf₂ ))
-        exact Proof.castSeqList h
+      let xs := (as.map .atoms) ++ antForms ++ (block.map Imp.toForm); let ys := (bs.map .atoms) ++ fR ++ (impR.map Imp.toForm)
+      Result.map2proof premise₁ premise₂
+          (λ pf₁ pf₂ ↦ by
+          have rule := (getPairs (Proof.castSeqList pf₁) (Proof.castSeqList pf₂ )).map
+                          (impl a b xs ys).uncurry
+          exact Proof.castSeqList rule)
+          (λ rs₁ ↦ Refutation.castSeqList ((Refutation.castSeqList rs₁).map (Refutation.impl₁ hist a b xs ys)))
+          (λ rs₂ ↦ Refutation.castSeqList ((Refutation.castSeqList rs₂).map (Refutation.impl₂ hist a b xs ys)))
+
 
 termination_by s.weight cap hcap
 decreasing_by
-all_goals simp [Seq4Proof.weight]; try grind; sorry --[Seq4Proof.weight, Weight.wellFoundedRelation, Weight.instLT]
-. /- simp at *
+all_goals simp_all [Seq4Proof.weight, Weight.instLT, Weight.instWellFoundedRelation]; try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT];
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+. sorry
+ /- simp at *
   have hx : { f, g} ∉ hist := by
     intro hmem
     have : { f, g} ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
@@ -272,13 +341,13 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
   match res with
   | .proof ps => String.toFormat (listProofToString ps)
-  | .cm cms =>
-    if cms.all (fun cm => evalSeq s cm == TV.f) then
+  | .refutation rf => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf)
+/-     if cms.all (fun cm => evalSeq s cm == TV.f) then
       let strs := cms.map toString
       String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]")
     else  dbg_trace "APPI {cms.map (fun cm => evalSeq s cm) }"
       let strs := cms.map toString
-      String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]")
+      String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]") -/
 
 
 --modusponens "a → b, a ⊢ β"

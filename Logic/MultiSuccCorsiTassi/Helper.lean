@@ -131,7 +131,7 @@ def getPairs (xs : List α ) (ys : List β ) : List (α × β) :=
   | [] => []
   | x::xs' => List.map (λ y => (x , y)) ys ++ getPairs xs' ys
 
-
+#eval [1,2,3,3,4] ∩ [1,3,3]
 /- find common atoms in anticident atoms list and succedent atoms list.
   current: wo duplicates
   Maybe return positions, to be precise, List (Atom, (index from xs, index from ys)) -/
