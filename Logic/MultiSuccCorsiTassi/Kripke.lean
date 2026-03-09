@@ -475,4 +475,16 @@ theorem imp_false_then_b_false  (impF : (a ⊃ b).eval m = TV.f) (wf : m.wf) : b
     rcases h with ⟨m', mem, h₂⟩
     exact imp_false_branch mem h₂ wf
 
+--IN USE
+theorem b_true_then_imp_true_branch {a b : Form} (wf : m.wf) (bT : b.eval m = TV.t) : (a ⊃ b).eval m = TV.t := by
+  rw [eval_imp_true_iff]
+  constructor
+  . simp_all
+  . simp; intro m' mh'
+    have b_fut := Model.momo_branch_true wf mh' bT
+    have m'_wf : m'.wf := by rw [Model.wf] at wf; simp_all
+    apply  b_true_then_imp_true_branch m'_wf b_fut
+termination_by (m.depth)
+decreasing_by exact depth_lt_of_mem mh'
+
 end multiSucc

@@ -115,8 +115,7 @@ def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refu
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impr h a b as bs xs ys _ proof  =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→R: {listToString (as.map .atoms) ++ listToString (xs.map Imp.toForm)} ⊬
-                         {a} → {b}, {listToString (bs.map .atoms) ++ listToString (ys.map Imp.toForm)}"
+  let ruleLine := s!"→R: {listToString (as.map .atoms) ++ listToString (xs.map Imp.toForm)} ⊬ {a} → {b}, {listToString (bs.map .atoms) ++ listToString (ys.map Imp.toForm)}"
   s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .afort h a b xs ys _ proof  =>
   let premise := refutationToString (indentLvl + 1) proof
