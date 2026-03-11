@@ -141,7 +141,7 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 
 @[simp]
 def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
-  have ant := Multiset.ofList ((p.as.map .atoms) ++ p.fL ++ p.block.map Imp.toForm)
+  have ant := Multiset.ofList ((p.as.map .atoms) ++ p.fL ++ p.block.map Imp.toForm) --blocked is not apart of seq anymore, sperate for evaling refs
   have succ := Multiset.ofList ((p.bs.map .atoms) ++ p.fR ++ p.impR.map Imp.toForm)  -- hist is to monitor R→ usage, not to display
   ⟨ant, succ⟩
 

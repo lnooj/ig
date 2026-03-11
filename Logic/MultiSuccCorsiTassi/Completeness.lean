@@ -28,14 +28,6 @@ match ref with
 /- @[simp] lemma Refutation.getCM_botr {xs ys : List Form} (r : Refutation ⟨↑xs, ↑ys⟩ hs) : (Refutation.botr hs xs ys r).getCM = r.getCM := by simp_all
 @[simp] lemma Refutation.getCM_andl (r : Refu) -/
 
-lemma Refutation.impr_a_eval {a b : Form}
-  (prem : Refutation
-    { Γ := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm xs), Δ := {b} }
-       ({ f := a, g := b } :: hs)):
-  Form.eval a (Refutation.impr hs a b as bs xs ys i prem).getCM = TV.t := by
-  rw [getCM]
-  sorry
-
 def Result.getCMs (r : Result s h) : List Model :=
 match r with
 | refutation rfs => rfs.map (λ rf ↦ Refutation.getCM rf )
@@ -51,6 +43,16 @@ theorem Refutation.cm_wf (r : Refutation s h) : r.getCM.wf := by
     intro fm; sorry-- apply ih; grind [Refutation.getCM, Model.wf]
 
 
+
+
+lemma Refutation.impr_a_eval {a b : Form}
+  (prem : Refutation
+    { Γ := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm xs), Δ := {b} }
+       ({ f := a, g := b } :: hs)) :
+  Form.eval a (Refutation.impr hs a b as bs xs ys i prem).getCM = TV.t := by
+  rw [getCM]
+  sorry
+
 /- theorem if_hs_then_impr
   (pf : { f := a, g := b } ∈ hs) (r : Refutation { Γ := ↑xs, Δ := ↑((a ⊃ b) :: ys) } hs ) :
   Refutation.impr ∈ r -/
@@ -60,17 +62,25 @@ theorem Refutation.afort_corr {hs : List Imp} {a b : Form}
   (r : Refutation s hs )
   --(hΔ : s.Δ = ↑((a ⊃ b) :: ys))
   : a.eval r.getCM = .t := by
-  induction r  <;> try (rw [Refutation.getCM]; assumption); simp_all; sorry
-
+  induction r  with
+  | ax => simp_all; sorry
+  | botr => simp_all
+  | andl => simp_all
+  | andr₁ => simp_all
+  | andr₂ => simp_all
+  | orl₁ => simp_all
+  | orl₂ => simp_all
+  | orr => simp_all
+  | impr hs' a' b' as bs xs ys i prem ih => simp_all
 
 
 theorem Refutation.blocked_corr {i : Imp}
-  (r : Refutation { Γ := ↑(List.map Form.atoms as ++ List.map Imp.toForm xs),
+  (r : Refutation { Γ := ↑(List.map Form.atoms as ++ List.map Imp.toForm blocked),
                     Δ := ↑(List.map Form.atoms bs) } hs)
-  (ixs : i ∈ xs) : i.g.eval r.getCM = TV.f := sorry
+  (ixs : i ∈ blocked) : i.g.eval r.getCM = TV.t := sorry
 
 theorem Refutation.correctness :
-  ∀ (s : Sequent) ( r : Refutation s h) (wf : r.getCM.wf ), evalSeq s r.getCM = TV.f := by
+  ∀ (s : Sequent) ( r : Refutation s b h) (wf : r.getCM.wf ), evalSeq ⟨s.Γ ∪ b.map Imp.toForm , s.Δ⟩ r.getCM = TV.f := by
   intro s r wf
   induction r with
   | ax hs as bs xs i =>
@@ -82,7 +92,7 @@ theorem Refutation.correctness :
     . intro x hx
       rcases hx with hx | h₂
       . obtain ⟨a, ain, a_atom⟩ := hx ; rw [← a_atom]; rw [Form.eval]; simp_all
-      . obtain ⟨a, ain, a_imp⟩ := h₂; rw [← a_imp]; rw [Form.eval]; simp_all; sorry --need to show that blocked evaluates to false
+      . obtain ⟨a, ain, a_imp⟩ := h₂; rw [← a_imp]; rw [Form.eval]; simp_all; sorry --need to show that blocked evaluates to true
     . intro b hb; rw [Form.eval]; simp_all
       rw [List.inter_eq_nil_iff_disjoint] at i;
       exact Not.imp (id (List.Disjoint.symm i) hb) fun a => a
@@ -95,13 +105,29 @@ theorem Refutation.correctness :
   | orl₂ => simp_all
   | orr => simp_all
   | impr hs a b as bs xs ys i prem ih =>
+/-     simp only [getCM] at wf; specialize ih wf; -- rw [Model.wf] at wf;
+    simp_all
+    obtain ⟨⟨h₁, h₃⟩, h₂⟩ := ih
+    intro x xh
+    specialize h₃ x
+    rcases xh with m | mm | mmm
+    . obtain ⟨a, abs, a_tom⟩ := m; rw [← a_tom]; -/
+
     simp only [getCM] at wf; rw [Model.wf] at wf; simp only [List.cons_append, List.attach_cons,
       List.attach_nil, List.map_nil, Subtype.forall, List.mem_cons, List.not_mem_nil, or_false,
       decide_eq_true_eq] at wf
     specialize wf prem.getCM rfl (by grind)
-    obtain ⟨h₁, h₂, h₃⟩ := wf
-    specialize ih h₁
-    sorry
+    obtain ⟨wf_h₁, wf_h₂, wf_h₃⟩ := wf
+    specialize ih wf_h₁
+    simp_all
+    rcases ih with ⟨⟨h₁, h₃⟩, h₂⟩
+    constructor
+    . intro x pr; specialize h₃ x pr; sorry --x is tru in branch, why true in parent? have := Model.momo_branch_true wf_h₁ (by sorry)
+    . intro x pr
+      rcases pr with in_bs | imp | immp
+      . obtain ⟨a_bs, atomn, aaaa⟩ := in_bs; sorry-- sth in bs is false, doable
+      . sorry --difficult
+      . sorry --stuff in ys false, also difficult
   | impl₁ => simp_all
   | impl₂ hs a b xs ys prem ih =>
     simp only [getCM] at wf; specialize ih wf

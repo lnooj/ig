@@ -85,5 +85,7 @@ def horizontalLine (n : Nat) : String :=
 def listToString (xs : List Form) : String :=
   String.intercalate ", " (xs.map Form.toString)
 
+def listToStringBlocked (xs : List Imp) : String :=
+  String.intercalate ", " (xs.map Imp.toStringBlocked)
 
 end multiSucc
