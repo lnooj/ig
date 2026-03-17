@@ -9,57 +9,80 @@ open multiSucc
 
 
 @[simp, grind]
-def Refutation.getCM (ref : Refutation s h) /- (m : Model) (wf : m.wf) -/:  Model :=
+def Refutation.getCM (ref : Refutation s b h) :  Model :=
 match ref with
-| ax hs as bs xs pf => ⟨⟨as.toFinset, bs.toFinset⟩, []⟩
-| botr hs xs ys prem =>  Refutation.getCM prem
-| andl hs a b xs ys prem => Refutation.getCM prem
-| andr₁ hs a b xs ys prem => Refutation.getCM prem
-| andr₂ hs a b xs ys prem => Refutation.getCM prem
-| orl₁ hs a b xs ys prem => Refutation.getCM prem
-| orl₂ hs a b xs ys prem => Refutation.getCM prem
-| orr hs a b xs ys prem => Refutation.getCM prem
-| impr hs a b as bs xs ys pf prem => ⟨⟨as.toFinset, bs.toFinset⟩, [Refutation.getCM prem]⟩
-| impl₁ hs a b xs ys prem => Refutation.getCM prem
-| impl₂ hs a b xs ys prem => Refutation.getCM prem
-| afort hs a b xs ys pf prem => Refutation.getCM prem
+| ax bl hs as bs pf => ⟨⟨as.toFinset, bs.toFinset⟩, []⟩
+| botr bl hs xs ys prem =>  prem.getCM
+| andl bl hs a b xs ys prem => prem.getCM
+| andr₁ bl hs a b xs ys prem => prem.getCM
+| andr₂ bl hs a b xs ys prem => prem.getCM
+| orl₁ bl hs a b xs ys prem => prem.getCM
+| orl₂ bl hs a b xs ys prem => prem.getCM
+| orr bl hs a b xs ys prem => prem.getCM
+| impr bl hs as bs ys pf prem =>
+  let children : List Model := ys.attach.map (λ ⟨⟨a, b⟩, yh⟩ ↦ (prem a b yh ).getCM)
+  let cUn := Models.getUnforced children
+  ⟨⟨as.toFinset, bs.toFinset ∪ cUn⟩, children⟩-- add children unforced to bs
+| impl₁ bl hs a b xs ys prem => prem.getCM
+| impl₂ bl hs a b xs ys prem => prem.getCM
+| afort bl hs a b xs ys pf prem => prem.getCM
 
+/- def Refutation.getPremise  (ref : Refutation s b h) : (List (Refutation s' b' h') ⊕ Refutation s' b' h') :=
+match ref with
+| ax bl hs as bs pf => .inl []
+| botr bl hs xs ys prem =>  .inr (prem )
+| andl bl hs a b xs ys prem => .inr prem
+| andr₁ bl hs a b xs ys prem => .inr prem
+| andr₂ bl hs a b xs ys prem => .inr prem
+| orl₁ bl hs a b xs ys prem => .inr prem
+| orl₂ bl hs a b xs ys prem => .inr prem
+| orr bl hs a b xs ys prem => .inr prem
+| impr bl hs as bs ys pf prem =>
+  have children := ys.attach.map (λ ⟨⟨a, b⟩, yh⟩ ↦ (prem a b yh ))
+  .inl children
+| impl₁ bl hs a b xs ys prem => .inr prem
+| impl₂ bl hs a b xs ys prem => .inr prem
+| afort bl hs a b xs ys pf prem => .inr prem
+ -/
 
-/- @[simp] lemma Refutation.getCM_botr {xs ys : List Form} (r : Refutation ⟨↑xs, ↑ys⟩ hs) : (Refutation.botr hs xs ys r).getCM = r.getCM := by simp_all
-@[simp] lemma Refutation.getCM_andl (r : Refu) -/
-
-def Result.getCMs (r : Result s h) : List Model :=
+def Result.getCMs (r : Result s b h) : List Model :=
 match r with
-| refutation rfs => rfs.map (λ rf ↦ Refutation.getCM rf )
+| refutation rfs _ => rfs.map (λ rf ↦ Refutation.getCM rf )
 | _ => []
 
 --@[simp, grind =]
-theorem Refutation.cm_wf (r : Refutation s h) : r.getCM.wf := by
+theorem Refutation.cm_wf (r : Refutation s b h) : r.getCM.wf := by
   induction r <;> try (rw [Refutation.getCM]; assumption)
   . rw [Refutation.getCM, Model.wf]; simp
-  . rename_i i a ih
-    --rw [ Model.wf] at ih; simp at ih
-    rw [Refutation.getCM, Model.wf]; simp only [Model.branch, decide_eq_true_eq];
-    intro fm; sorry-- apply ih; grind [Refutation.getCM, Model.wf]
+  . rename_i i a ih; simp_all; rw [Model.wf]; simp;
+    intro m imp imp_in imp_m; let ⟨f,g⟩ := imp
+    specialize ih f g imp_in; --specialize a f g imp_in
+    simp_all; set r := a f g imp_in
+
+
+    sorry
 
 
 
 
-lemma Refutation.impr_a_eval {a b : Form}
+/- lemma Refutation.impr_a_eval {a b : Form}
   (prem : Refutation
     { Γ := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm xs), Δ := {b} }
        ({ f := a, g := b } :: hs)) :
   Form.eval a (Refutation.impr hs a b as bs xs ys i prem).getCM = TV.t := by
   rw [getCM]
-  sorry
+  sorry -/
 
 /- theorem if_hs_then_impr
   (pf : { f := a, g := b } ∈ hs) (r : Refutation { Γ := ↑xs, Δ := ↑((a ⊃ b) :: ys) } hs ) :
   Refutation.impr ∈ r -/
 --TODO
+
+
 theorem Refutation.afort_corr {hs : List Imp} {a b : Form}
   (pf : { f := a, g := b } ∈ hs)
-  (r : Refutation s hs )
+  (r : Refutation s bl hs )
+  (wf : r.getCM.wf)
   --(hΔ : s.Δ = ↑((a ⊃ b) :: ys))
   : a.eval r.getCM = .t := by
   induction r  with
@@ -71,19 +94,30 @@ theorem Refutation.afort_corr {hs : List Imp} {a b : Form}
   | orl₁ => simp_all
   | orl₂ => simp_all
   | orr => simp_all
-  | impr hs' a' b' as bs xs ys i prem ih => simp_all
+  | impr bl hs' as bs ys i prem ih =>
+    simp_all; --rw [Model.wf] at wf; simp_all
+    have : { f := a, g := b } ∈ ys := sorry
+    have swf := wf; rw [Model.wf] at swf
+    simp_all
+    specialize ih a b this (by grind); specialize prem a b
+    sorry--let := Model.momo_branch_true wf (by sorry) (by sorry)
+  | impl₁ => simp_all
+  | impl₂ => simp_all
+  | afort =>  simp_all
 
 
 theorem Refutation.blocked_corr {i : Imp}
-  (r : Refutation { Γ := ↑(List.map Form.atoms as ++ List.map Imp.toForm blocked),
-                    Δ := ↑(List.map Form.atoms bs) } hs)
-  (ixs : i ∈ blocked) : i.g.eval r.getCM = TV.t := sorry
+  (r : Refutation { Γ := ↑(List.map Form.atoms as),
+                    Δ := ↑(List.map Form.atoms bs) } bl hs)
+  (ixs : i ∈ bl) : i.g.eval r.getCM = TV.t := sorry
 
 theorem Refutation.correctness :
-  ∀ (s : Sequent) ( r : Refutation s b h) (wf : r.getCM.wf ), evalSeq ⟨s.Γ ∪ b.map Imp.toForm , s.Δ⟩ r.getCM = TV.f := by
+  ∀ (s : Sequent) ( r : Refutation s b h) (wf : r.getCM.wf )
+    /- (histh : ⟨f,g⟩ ∈ h → f.eval r.getCM = TV.t) -/,
+      evalSeq s r.getCM = TV.f := by
   intro s r wf
   induction r with
-  | ax hs as bs xs i =>
+  | ax bl hs as bs i =>
     simp only [getCM] at wf ⊢
     simp_all only [evalSeq_false_iff, evalAnt_eq_true, Multiset.mem_coe, List.mem_append,
       List.mem_map, Imp.toForm, evalSucc_eq_false, forall_exists_index, and_imp,
@@ -104,38 +138,27 @@ theorem Refutation.correctness :
   | orl₁ => simp_all
   | orl₂ => simp_all
   | orr => simp_all
-  | impr hs a b as bs xs ys i prem ih =>
-/-     simp only [getCM] at wf; specialize ih wf; -- rw [Model.wf] at wf;
-    simp_all
-    obtain ⟨⟨h₁, h₃⟩, h₂⟩ := ih
-    intro x xh
-    specialize h₃ x
-    rcases xh with m | mm | mmm
-    . obtain ⟨a, abs, a_tom⟩ := m; rw [← a_tom]; -/
-
-    simp only [getCM] at wf; rw [Model.wf] at wf; simp only [List.cons_append, List.attach_cons,
-      List.attach_nil, List.map_nil, Subtype.forall, List.mem_cons, List.not_mem_nil, or_false,
-      decide_eq_true_eq] at wf
-    specialize wf prem.getCM rfl (by grind)
-    obtain ⟨wf_h₁, wf_h₂, wf_h₃⟩ := wf
-    specialize ih wf_h₁
-    simp_all
-    rcases ih with ⟨⟨h₁, h₃⟩, h₂⟩
+  | impr bs hs as bs ys i prem ih =>
+    simp_all; rw [Model.wf] at wf; simp_all
+    intro imp; specialize ih f g
     constructor
-    . intro x pr; specialize h₃ x pr; sorry --x is tru in branch, why true in parent? have := Model.momo_branch_true wf_h₁ (by sorry)
-    . intro x pr
-      rcases pr with in_bs | imp | immp
-      . obtain ⟨a_bs, atomn, aaaa⟩ := in_bs; sorry-- sth in bs is false, doable
-      . sorry --difficult
-      . sorry --stuff in ys false, also difficult
+    . intro x ih₁
+      rcases ih₁ with ⟨ato, in_as, h₃⟩ | ⟨imp, in_bl, h₄⟩
+      . subst_eqs; sorry -- atom in as true
+      . let ⟨f, g⟩ := imp; sorry -- in blocked true
+    . intro x ih₂
+      rcases ih₂ with ⟨ato, in_bs, h₃⟩ | ⟨imp, in_ys, h₄⟩
+      . subst_eqs; sorry --atom in bs false
+      . let ⟨f, g⟩ := imp
+        specialize ih f g in_ys; simp_all; sorry -- imp in ys false
   | impl₁ => simp_all
-  | impl₂ hs a b xs ys prem ih =>
+  | impl₂ bl hs a b xs ys prem ih =>
     simp only [getCM] at wf; specialize ih wf
     simp_all
     rcases ih with ⟨⟨h₁, h₂⟩, h₃⟩
     apply b_true_then_imp_true_branch wf h₁
 
-  | afort hs a b xs ys pf prem ih =>
+  | afort bl hs a b xs ys pf prem ih =>
     simp only [getCM] at wf
     specialize ih wf
     simp_all

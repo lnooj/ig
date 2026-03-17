@@ -40,6 +40,10 @@ all_goals
   apply List.sizeOf_lt_of_mem
   grind
 
+@[grind, simp]
+def Models.getUnforced : List Model → Finset Atom
+| [] => {}
+| x :: xs => x.world.unforced ∪ Models.getUnforced xs
 
 def Model.depth : Model → Nat
 | ⟨_, branch⟩ =>

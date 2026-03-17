@@ -145,70 +145,59 @@ def Result.map2proof (r₁ : Result s1 b1 h1) (r₂ : Result s2 b2 h2)
   | .refutation rs₁ _, .refutation rs₂ _ => .refutation ( rs₁.map ref₁ ++ rs₂.map ref₂) (by simp; grind only)
   | .refutation  rs _, _ => .refutation (rs.map ref₁) (by simpa)
   | _, .refutation rs _ => .refutation (rs.map ref₂) (by simpa)
-/-
-have mmm := --premise.map ruleP ruleR
-          premise.map
-                (λ pf ↦ by
-                  let res := (Proof.castSeqList pf).map ruleP
-                  exact Proof.castSeqList res)
-                (λ rs ↦ by
-                  let res := (Refutation.castSeqList rs).map ruleR
-                  exact Refutation.castSeqList res
-                    )
-                     -/
+
 
 -- [[1,2] [3] [4,5]] = [[1,3,4] [1,3,5] [2,3,4] [2,3,5]]
-def choicesCM : List (List CM) → List (List CM)
-| [] => [[]]
-| [] :: _ => []
-| (x :: xs) :: xss =>
-    (choicesCM xss).map (fun ys => x :: ys) ++
-    choicesCM (xs :: xss)
+def choices : List (List CM) → List (List CM)
+| [] => []
+| [x] => x.map ([·])
+| x::y::xs => x.product (choices (y::xs)) |>.map (fun ⟨a, as⟩ ↦ a :: as)
 
-/-- Picks only proofs if any, else returns []  -/
-def pickproof : List (List A ⊕ List B) → List (List A) ⊕ List (List B)
-| [] => .inl []
-| .inl a::as =>
-  match pickproof as with
-  | .inl as' => .inl (a::as')
-  | .inr _ => .inl [a]
-| .inr b::bs =>
-  match pickproof bs with
-  | .inl as => .inl as
-  | .inr bs' => .inr (b::bs')
+/- @[simp, grind =]
+theorem product_length {as : List α} {bs : List β} :
+    (as.product bs).length = as.length * bs.length := by
+  simp [List.product, List.map_const']
 
+attribute [grind =] List.pair_mem_product -/
 
+/- @[simp, grind =]
+theorem choices_length {xs : List (List α)} :
+    (choices xs).length = if xs = [] then 0 else (xs.map (·.length)).prod := by
+  fun_induction choices with grind -/
 
-def automatedProof.botr_
-    (s : Seq4Proof)
-(cap : ℕ)
-(as : List Atom)
-(fL : List Form)
-(block : List Imp)
-(bs : List Atom)
-(fR : List Form)
-(impR hist : List Imp)
-(a b : Form)
-(succForms : List Form)
-(premise₁ : Result
-  { Γ := ↑(List.map Form.atoms as ++ List.map Imp.toForm block),
-    Δ := ↑(List.map Form.atoms bs ++ a :: (succForms ++ List.map Imp.toForm impR)) }
-  block hist)
-(premise₂ : Result
-  { Γ := ↑(List.map Form.atoms as ++ List.map Imp.toForm block),
-    Δ := ↑(List.map Form.atoms bs ++ b :: (succForms ++ List.map Imp.toForm impR)) }
-  block hist)
-: Result
-  { Γ := ↑(List.map Form.atoms as ++ List.map Imp.toForm block),
-    Δ := ↑(List.map Form.atoms bs ++ (a ∧∧ b) :: (succForms ++ List.map Imp.toForm impR)) }
-  block hist
-    := by
+@[grind =, simp]
+theorem choices_eq_nil {xs : List (List α)} : choices xs = [] ↔ xs = [] ∨ [] ∈ xs := by
+  fun_induction choices with
+  | case1 => simp
+  | case2 => simp
+  | case3 => simp_all; grind
 
-  let xs := (as.map .atoms) ++ (block.map Imp.toForm);
-  let ys := (bs.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
-  have ruleP := andr a b xs ys;
-  have ruleR₁ := andr₁ block hist a b xs ys; have ruleR₂ := andr₂ block hist a b xs ys
-  exact (Result.map2proof premise₁.castSeq premise₂.castSeq ruleP ruleR₁ ruleR₂).castSeq
+/-- Picks only proofs (α) if any, else returns all the refutations (β)
+if .inl (proof) is returned, it is never empty, if .inr is returned, it is the length of the original input list -/
+def pickProof : List (α ⊕ β) → List (α) ⊕ List (β)
+| [] => .inr [] --empty refutation
+  | x::xs =>
+    match x, pickProof xs with
+    | .inl a, .inl as => .inl (a::as)
+    | .inl a, .inr _  => .inl [a] --single proof
+    | .inr _, .inl as => .inl as
+    | .inr b, .inr bs => .inr (b::bs) --all refutations
+
+attribute [local grind =] List.filterMap_eq_nil_iff in
+@[grind .]
+theorem pickProof_eq {xs : List (α ⊕ β)} {ys : List α ⊕ List β} :
+    pickProof xs = ys ↔
+      match ys with
+      | .inl as => xs.filterMap Sum.getLeft? = as ∧ as ≠ []
+      | .inr bs => xs = bs.map .inr := by
+  fun_induction pickProof generalizing ys <;> rcases ys <;> simp_all <;> try grind [cases List]
+
+@[simp, grind =]
+theorem pickProof_eq_inl {xs : List (α ⊕ β)} {ys : List α} :
+    pickProof xs = .inl ys ↔ xs.filterMap Sum.getLeft? = ys ∧ ¬ys = [] := by simp [pickProof_eq]
+@[simp, grind =]
+theorem pickProof_eq_inr {xs : List (α ⊕ β)} {ys : List β} :
+    pickProof xs = .inr ys ↔ xs = ys.map .inr := by simp [pickProof_eq]
 
 
 
@@ -253,9 +242,9 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
           | impR => by
             simp only [Seq4Proof.toSeq, List.append_nil]
             let impRApplications :
+            -- find either a list of proofs for any of the imps, if none found, get the function required to get ALL refutations
                 List (List (Proof ⟨↑(as.map Form.atoms ++ block.map Imp.toForm), ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩)  ⊕
                       List ((a b : Form) × Refutation ⟨↑(a :: as.map Form.atoms ++ block.map Imp.toForm), {b}⟩ [] (⟨a,b⟩ :: hist))) :=
-
               impR.attach.map (λ (⟨⟨f, g⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦
                 have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆   impR.toFinset.biUnion collectImpsImp := by
                   intro x hx
@@ -265,29 +254,31 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                   exact hx
                 have eq : block.toFinset.biUnion collectImpsImp = (block.map Imp.toForm ).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
 
-                have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind) (by simp)
+                have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
+                                                (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind) (by simp)
                 let xs := as.map Form.atoms ++ block.map Imp.toForm; let ys := bs.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
                 have ruleP := (impr f g xs ys)
                 --have ruleR := (Refutation.impr block hist as bs impR (by grind))
                 match premise with
-                | .proof pf _ => .inl (pf.map (λ p ↦ (ruleP p.castSeq).castSeq))
-                | .refutation rf _ => .inr (rf.map (λ p ↦ ⟨ f, g , p.castSeq⟩))
+                | .proof pf neqE => .inl (pf.map (λ p ↦ (ruleP p.castSeq).castSeq))
+                | .refutation rf neqE => .inr (rf.map (λ p ↦ ⟨ f, g , p.castSeq⟩))
                 --(premise.castSeq.map (b := []) (h := ⟨f, g⟩ :: hist) block hist ruleP (λ r ↦ (ruleR r).castSeq)).castSeq
               )
-            let res := pickproof impRApplications
-            match _ : pickproof impRApplications with
-            | .inl pf => exact Result.proof pf.flatten (by rename_i h; subst_eqs; simp [pickproof] at h; sorry)
+            let res := pickProof impRApplications
+            --let neqE : impRApplications.filterMap Sum.getLeft? = some ys
+            match _ : pickProof impRApplications with
+            | .inl pf => exact Result.proof pf.flatten (by simp_all; rename_i h; sorry )
             | .inr rfs =>
-              have choices := choicesCM rfs
-              have ruleR := (Refutation.impr block hist as bs impR (by grind))
+              have choices := choices rfs --all dif ways to construct refutation
+              have ruleR := (Refutation.impr block hist as bs impR (by grind)) --new parent to choices
               exact .refutation (choices.attach.map (λ ⟨c, h⟩ ↦
                                                 ruleR (λ a b hab ↦
-                                                  (c.findSome? (λ ⟨a', b', r'⟩ ↦
+                                                  (c.findSome? (λ ⟨a', b', r'⟩ ↦ -- find the same imp in child as in parent
                                                     if _ : a = a' ∧ b = b'
                                                       then some (r'.castSeq (hb := by grind) (hh := by grind))
-                                                    else none)).get sorry)
+                                                    else none)).get sorry)--prove that same imps can be found in choices as in parent
                                                     )
-                                ) sorry
+                                ) (by simp_all; intro a; sorry)
         | xs@(_::_) => by
           --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
           --have corr := findIntersCorr as bs
@@ -370,21 +361,17 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
 
 termination_by s.weight cap hcap
 decreasing_by
-all_goals simp_all [Seq4Proof.weight, Weight.instLT, Weight.instWellFoundedRelation]; try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT];
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
-. sorry
+all_goals simp_all [Seq4Proof.weight, Weight.lt_iff]; try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT];
+. have hx : { f, g} ∉ hist := by
+    intro hmem
+    have : { f, g} ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
+    simp_all
+  have hxFin : { f, g} ∉ hist.toFinset := by simp; exact hx
+  have hcard : hist.toFinset.card < (insert { f, g} hist.toFinset).card := by
+    have : (insert { f, g} hist.toFinset).card = hist.toFinset.card + 1 := Finset.card_insert_of_notMem hxFin
+    grind
+  grind
+
  /- simp at *
   have hx : { f, g} ∉ hist := by
     intro hmem
@@ -404,8 +391,8 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
   have res := automatedProof s.toSeq4 s.toSeq4.cap.card (by simp) (by simp [Sequent.toSeq4])
 
   match res with
-  | .proof ps => String.toFormat (listProofToString ps)
-  | .refutation rf => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf)
+  | .proof ps _ =>  dbg_trace s!"have proof {ps.length}"; String.toFormat (listProofToString ps)
+  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf)
 /-     if cms.all (fun cm => evalSeq s cm == TV.f) then
       let strs := cms.map toString
       String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]")
