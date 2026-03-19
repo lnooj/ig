@@ -177,6 +177,10 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 #eval Multiset.sort example1 LE.le
 #eval Multiset.sort example2 LE.le
 
+def Sequent.Γa_getList { s : Sequent} : List Form := Multiset.sort s.Γa LE.le
+def Sequent.Γb_getList { s : Sequent} : List Imp := Multiset.sort s.Γb LE.le
+def Sequent.Δ_getList { s : Sequent} : List Form := Multiset.sort s.Δ LE.le
+
 
 @[simp]
 def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
@@ -189,6 +193,6 @@ def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
 
 
 def Sequent.toSeq4 (s : Sequent) : Seq4Proof :=
-Seq4Proof.mk [] (Multiset.sort s.Γa LE.le) (Multiset.sort s.Γb LE.le) [] (Multiset.sort s.Δ LE.le) [] []
+Seq4Proof.mk [] s.Γa_getList s.Γb_getList [] s.Δ_getList [] []
 
 end multiSucc

@@ -99,12 +99,6 @@ def Result.castSeq (x : Result ⟨a₁, b₁, c₁⟩ h)
   (hh : h = h' := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
   Result ⟨a₂, b₂, c₂⟩ h' := by subst_eqs; exact x
 
-/- def Result.map' (r : Result s)
-  (f₁ : List (Proof s) → List (Proof s'))
-  (f₂ : List (Refutation s b h) → List (Refutation s' b' h')): Result s':=
-  match r with
-  | .proof ps => .proof (f₁ ps)
-  | .refutation rs   => .refutation (f₂ rs) -/
 
 def Result.map
   (r : Result s h)
@@ -115,26 +109,6 @@ def Result.map
   match r with
   | .proof ps _ => .proof (ps.map f₁) (by simpa)
   | .refutation rs _ => .refutation (rs.map f₂) (by simpa)
-  /-  (λ pf ↦ by
-          let res := (Proof.castSeqList pf).map f₁
-          exact Proof.castSeqList res)
-        (λ rs ↦ by
-          let res := (Refutation.castSeqList rs).map f₂
-          exact Refutation.castSeqList res
-            ) -/
-
-/- def Result.map2proofList (r₁ : Result s1 b1 h1) (r₂ : Result s2 b2 h2)
-  (fproof : List (Proof s1) →
-            List (Proof s2) →
-            List (Proof s'))
-  (ref₁ : List (Refutation s1 b1 h1) → List (Refutation s' b' h'))
-  (ref₂ : List (Refutation s2 b2 h2) → List (Refutation s' b' h')): Result s' b' h':=
-  match r₁, r₂ with
-  | .proof ps₁ _, .proof ps₂ _ => .proof (fproof ps₁ ps₂) (by sorry)
-  | .refutation rs₁ _, .refutation rs₂ _ => .refutation ( ref₁ rs₁ ++ ref₂ rs₂) (by sorry)
-  | .refutation  rs _ , _ => .refutation (ref₁ rs) (by sorry)
-  | _, .refutation rs _ => .refutation (ref₂ rs) (by sorry)
- -/
 
 def Result.map2proof (r₁ : Result s1 h1) (r₂ : Result s2 h2)
   (fproof : (Proof s1) →
@@ -370,20 +344,6 @@ all_goals simp_all [Seq4Proof.weight, Weight.lt_iff]; try grind [Seq4Proof.weigh
     grind
   grind
 
- /- simp at *
-  have hx : { f, g} ∉ hist := by
-    intro hmem
-    have : { f, g} ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
-    simp [metaR1] at this
-  have hxFin : { f, g} ∉ hist.toFinset := by simp; exact hx
-  have hcard : hist.toFinset.card < (insert { f, g} hist.toFinset).card := by
-    have : (insert { f, g} hist.toFinset).card = hist.toFinset.card + 1 := Finset.card_insert_of_notMem hxFin
-    grind
-  sorry
-. simp [Seq4Proof.weight, Weight.wellFoundedRelation, Weight.instLT] -/
-
-
-
 
 def automatedProofHelper (s : Sequent) : Std.Format :=
   have res := automatedProof s.toSeq4 s.toSeq4.cap.card (by simp) (by simp [Sequent.toSeq4])
@@ -391,13 +351,6 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
   match res with
   | .proof ps _ =>  dbg_trace s!"have proof {ps.length}"; String.toFormat (listProofToString ps)
   | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf)
-/-     if cms.all (fun cm => evalSeq s cm == TV.f) then
-      let strs := cms.map toString
-      String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]")
-    else  dbg_trace "APPI {cms.map (fun cm => evalSeq s cm) }"
-      let strs := cms.map toString
-      String.toFormat ("CM: [" ++ String.intercalate "]\n[ " strs ++ "]") -/
-
 
 --modusponens "a → b, a ⊢ β"
 #eval! automatedProofHelper (seq {(p → q), p ⊢ q})

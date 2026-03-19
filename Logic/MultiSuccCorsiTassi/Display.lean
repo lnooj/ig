@@ -16,7 +16,6 @@ def Form.toString : Form → String
   | .bot => "⊥"
   | .atoms a => ToString.toString a
   | .imp a .bot => s!"¬{a.toString}"
-  -- | .neg a => s!"¬{formToString a}"
   | .and a b => s!"({a.toString} ∧ {b.toString})"
   | .or a b => "(" ++ a.toString ++ " ∨ " ++ b.toString ++ ")"
   | .imp a b => "(" ++ a.toString ++ " ⊃ " ++ b.toString ++ ")"
@@ -30,20 +29,11 @@ instance : ToString Form := ⟨Form.toString⟩
 
 instance : ToString Sequent where
   toString seq :=
-  String.intercalate ", " ((Multiset.sort seq.Γa LE.le ).map Form.toString ++
-                          (Multiset.sort seq.Γb LE.le).map Imp.toStringBlocked) ++
+  String.intercalate ", " ((seq.Γa_getList).map Form.toString ++
+                          (seq.Γb_getList).map Imp.toStringBlocked) ++
   " ⊢ " ++
-  String.intercalate ", " ((Multiset.sort seq.Δ LE.le ).map Form.toString )
+  String.intercalate ", " ((seq.Δ_getList).map Form.toString )
 
-/- instance : ToString Seq4Proof where
-  toString seq4 :=
-  (seq4.as.map toString ).toString ++ (seq4.fL.map Form.toString ).toString ++ (seq4.block.map Imp.toStringBlocked ).toString
-  ++ "⊢" ++ (seq4.bs.map toString).toString  ++ (seq4.fR.map Form.toString).toString ++ (seq4.impR.map Imp.toString ).toString
- -/
-/- instance : ToString World where
-  toString world :=
-  String.intercalate ", " ((Multiset.sort world.forced LE.le).map toString) ++ world.forced.card.toSubscriptString
-    ++ " ⊢ " ++ String.intercalate ", " ((Multiset.sort world.unforced LE.le).map toString) -/
 
 instance : ToString World where
   toString world :=
@@ -58,16 +48,7 @@ def mToString : Model → String
 | ⟨w, bs⟩ =>
   let bstrs := bs.map mToString
   toString w ++ "\n " ++ indent 0 (String.intercalate "  |  " bstrs)
-/- partial def mToString (m : Model) (indent : String := "") : String :=
-  let worldStr := toString m.world
-  match m.branch with
-  | [] => indent ++ worldStr
-  | branches =>
-    let branchStrs := branches.map (fun child =>
-      mToString child (indent ++ "| ")
-    )
-    indent ++ worldStr ++ "\n" ++ (String.intercalate "\n" branchStrs) -/
---termiantion_by m.depth
+
 
 instance : ToString Model where
   toString m := mToString m
