@@ -167,26 +167,35 @@ all_goals first | (apply Prod.Lex.left; grind) | (apply Prod.Lex.right; apply de
 @[grind =, simp] theorem evalute_atom_undef : (Form.atoms a).eval m = .u ↔ a ∉ m.world.forced ∧ a ∉ m.world.unforced := by grind
 
 
-/- def evalBlocked : Imp → Model → TV
+
+def evalBlocked : Imp → Model → TV
 | {f, g}, m =>
-  if (m.branch.map (λ m' => (f ⊃ g).eval m' = .t)).all id then .t
-  else if (m.branch.map (λ m' => (f ⊃ g).eval m' = .f)).any id then .f
-  else .u -/
+  if (m.branch.attach.all (λ m' => (f ⊃ g).eval m'.val = .t)) then .t
+  else if (m.branch.attach.any (λ m' => (f ⊃ g).eval m'.val = .f)) then .f
+  else .u
 
 
 def evalAnt (Γ : Multiset Form) (m : Model) : TV :=
   (Γ.map (fun f => f.eval m)).fold conjTV TV.t
 scoped notation "⋀ " m:max ", " Γ:max => evalAnt Γ m
 
+def evalAntB (Γ : Multiset Imp) (m : Model) : TV :=
+  (Γ.map (fun f => evalBlocked f m)).fold conjTV TV.t
+scoped notation "⋀* " m:max ", " Γ:max => evalAntB Γ m
+
 def evalSucc (Δ : Multiset Form) (m : Model) : TV :=
   (Δ.map (fun f => f.eval m)).fold disjTV TV.f
 scoped notation "⋁ " m:max ", " Γ:max => evalSucc Γ m
 
+@[simp, grind]
+def Sequent.evalΓ : Sequent → Model → TV
+| ⟨Γa, Γb, Δ ⟩,  m => conjTV (evalAnt Γa m) (evalAntB Γb m)
+
 -- A sequent is refutable iff all its assumptions are satisfied (all forms in Γ are true) but none of the conclusions are (all Δ are false)
 @[grind]
-def evalSeq : Sequent /- → List Imp -/ → Model → TV
-| ⟨Γ, Δ ⟩, /- bl, -/ m =>
-  match (evalAnt Γ m) , (evalSucc Δ m) with
+def Sequent.eval : Sequent → Model → TV
+| s,  m =>
+  match s.evalΓ m, (evalSucc s.Δ m) with
   | .t, .f => .f
   | .f, _ | _, .t => .t
   | _, _ => .u
@@ -211,17 +220,18 @@ lemma beq_t_true_eq {v : TV} :
   . intro f; cases f
   . intro f; cases f
 
+variable {s : Sequent}
 @[simp]
-theorem evalSeq_true_iff :
-  evalSeq s m = TV.t ↔
-  evalAnt s.Γ m = TV.f ∨ evalSucc s.Δ m = TV.t := by
+theorem Sequent.eval_true_iff :
+  s.eval m = TV.t ↔
+  s.evalΓ m = TV.f ∨ evalSucc s.Δ m = TV.t := by
   grind
 
 @[simp]
-theorem evalSeq_false_iff :
-  evalSeq s m = TV.f ↔
-  evalAnt s.Γ m = TV.t ∧ evalSucc s.Δ m = TV.f := by
-  simp [evalSeq]
+theorem Sequent.eval_false_iff :
+  s.eval m = TV.f ↔
+  s.evalΓ m = TV.t ∧ evalSucc s.Δ m = TV.f := by
+  simp [Sequent.eval]
   split <;> grind
 
 @[grind ., simp]
@@ -260,6 +270,14 @@ lemma evalAnt_eq_false :
     ⋀ m, xs = .f ↔ ∃ x ∈ xs, x.eval m = .f := by
   induction xs using Multiset.induction with simp_all [evalAnt]
 @[grind =, simp]
+lemma evalAntB_eq_true :
+    ⋀* m, xs = .t ↔ ∀ x ∈ xs, evalBlocked x m = .t := by
+  induction xs using Multiset.induction with simp_all [evalAntB]
+@[grind =, simp]
+lemma evalAntB_eq_false :
+    ⋀* m, xs = .f ↔ ∃ x ∈ xs, evalBlocked x m = .f := by
+  induction xs using Multiset.induction with simp_all [evalAntB]
+@[grind =, simp]
 lemma evalSucc_eq_true :
     ⋁ m, xs = .t ↔ ∃ x ∈ xs, x.eval m = .t := by
   induction xs using Multiset.induction with simp_all [evalSucc]
@@ -273,6 +291,9 @@ lemma evalSucc_true (fin : f ∈ Δ ) (ev : f.eval m = TV.t ): evalSucc Δ m = T
 @[grind ., simp]
 lemma evalAnt_false (h₁ : f ∈ Γ) (h₂ : f.eval m = TV.f) : evalAnt Γ m = TV.f := by
   simp; grind
+@[grind ., simp]
+lemma evalAntB_false (h₁ : f ∈ s.Γb) (h₂ : evalBlocked f m = TV.f) : s.evalΓ m = TV.f := by
+  simp; grind
 
 
 
@@ -284,6 +305,14 @@ theorem eval_imp_true_iff :
   . intro h; rw [Form.eval] at h; simp_all; grind [Form.eval]
   . intro h; rw [Form.eval]; simp_all
 
+theorem evalBlocked_true_iff :
+  evalBlocked ⟨a, b⟩ m = TV.t ↔
+    (m.branch.all (λ m' => (a ⊃ b).eval m' = .t)) := by
+  constructor
+  . intro h; rw [evalBlocked] at h; simp_all only [List.all_eq_true, List.mem_attach,
+    decide_eq_true_eq, forall_const, Subtype.forall]; grind [Form.eval]
+  . intro h; rw [evalBlocked]; simp_all
+
 theorem eval_imp_false_iff :
   (a ⊃ b).eval m = TV.f ↔
     a.eval m = .t ∧  b.eval m = .f ∨ ∃ x ∈ m.branch, ((a ⊃ b).eval x = TV.f) := by
@@ -293,9 +322,16 @@ theorem eval_imp_false_iff :
     . grind
   . intro h; rw [Form.eval]; simp_all; grind
 
+theorem evalBlocked_false_iff :
+  evalBlocked ⟨a, b⟩ m = TV.f ↔
+    ∃ x ∈ m.branch, ((a ⊃ b).eval x = TV.f) := by
+  constructor
+  . intro h; rw [evalBlocked] at h; simp_all; grind
+  . intro h; rw [evalBlocked]; simp_all; grind
+
 theorem eval_imp_righ_wo_ys :
-  evalSeq { Γ := ↑xs, Δ := {a ⊃ b} } m ≠ TV.f →
-  evalSeq { Γ := ↑xs, Δ := ↑((a ⊃ b) :: ys) } m ≠ TV.f := by
+  Sequent.eval { Γa := xs, Γb := xs', Δ := {a ⊃ b} } m ≠ TV.f →
+  Sequent.eval { Γa := xs, Γb := xs', Δ := ↑((a ⊃ b) :: ys) } m ≠ TV.f := by
   simp; intro h₁ h₂; simp_all
 
 @[grind ., simp]

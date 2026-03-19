@@ -52,9 +52,14 @@ structure Weight (cap : ℕ) where
 
 namespace Weight
 
+@[grind]
+def lt (a b : Weight cap) := a.r > b.r ∨ a.r = b.r ∧ a.n < b.n
+
 @[simp]
-instance instLT (cap : ℕ) : LT (Weight cap) where
-  lt a b := a.r > b.r ∨ a.r = b.r ∧ a.n < b.n
+instance instLT (cap : ℕ) : LT (Weight cap) where lt := lt
+
+@[grind =]
+theorem lt_iff {a b : Weight cap} : a < b ↔ a.lt b := by rfl
 
 @[simp, grind]
 instance instWellFoundedRelation {cap : ℕ} : WellFoundedRelation (Weight cap) where
@@ -64,7 +69,7 @@ instance instWellFoundedRelation {cap : ℕ} : WellFoundedRelation (Weight cap) 
       invImage (fun x ↦ ⟨cap - x.r, x.n⟩) Prod.instWellFoundedRelation
     convert rel'.wf with a b
     simp only [WellFoundedRelation.rel, rel']
-    grind [instLT, InvImage, Nat.lt_wfRel, sizeOf_nat]
+    grind [InvImage, Nat.lt_wfRel, sizeOf_nat]
 
 
 end Weight
@@ -92,8 +97,8 @@ theorem collectImps_equality : ∀ (x : Imp), collectImpsImp x = collectImpsForm
 - every imp list is gone through recursively to collect ALL implications, exept the R→ list itsself (history)-/
 @[simp, grind]
 def Seq4Proof.cap (p : Seq4Proof) : Finset Imp:=
-   ((p.fL.toFinset.biUnion collectImpsForm) ∪ (p.block.toFinset.biUnion collectImpsImp) ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
-  (p.fR.toFinset.biUnion collectImpsForm) ∪ (p.impR.toFinset.biUnion collectImpsImp) ∪ p.hist.toFinset) -- rightImp gets also counted recursively, because when applying R→ the left and right side go to forms
+   p.fL.toFinset.biUnion collectImpsForm ∪ p.block.toFinset.biUnion collectImpsImp ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
+  p.fR.toFinset.biUnion collectImpsForm ∪ p.impR.toFinset.biUnion collectImpsImp ∪ p.hist.toFinset -- rightImp gets also counted recursively, because when applying R→ the left and right side go to forms
 
 /-- occurences of R→ rule so far, stored in history  -/
 @[simp, grind]

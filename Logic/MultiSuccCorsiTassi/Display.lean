@@ -28,17 +28,18 @@ def Imp.toStringBlocked (x : Imp) : String := x.toString ++ "*"
 instance : ToString Form := ⟨Form.toString⟩
 
 
-
 instance : ToString Sequent where
   toString seq :=
-  String.intercalate ", " ((Multiset.sort seq.Γ LE.le ).map Form.toString )
-    ++ " ⊢ " ++ String.intercalate ", " ((Multiset.sort seq.Δ LE.le ).map Form.toString )
+  String.intercalate ", " ((Multiset.sort seq.Γa LE.le ).map Form.toString ++
+                          (Multiset.sort seq.Γb LE.le).map Imp.toStringBlocked) ++
+  " ⊢ " ++
+  String.intercalate ", " ((Multiset.sort seq.Δ LE.le ).map Form.toString )
 
-instance : ToString Seq4Proof where
+/- instance : ToString Seq4Proof where
   toString seq4 :=
   (seq4.as.map toString ).toString ++ (seq4.fL.map Form.toString ).toString ++ (seq4.block.map Imp.toStringBlocked ).toString
   ++ "⊢" ++ (seq4.bs.map toString).toString  ++ (seq4.fR.map Form.toString).toString ++ (seq4.impR.map Imp.toString ).toString
-
+ -/
 /- instance : ToString World where
   toString world :=
   String.intercalate ", " ((Multiset.sort world.forced LE.le).map toString) ++ world.forced.card.toSubscriptString
@@ -85,7 +86,9 @@ def horizontalLine (n : Nat) : String :=
 def listToString (xs : List Form) : String :=
   String.intercalate ", " (xs.map Form.toString)
 
-def listToStringBlocked (xs : List Imp) : String :=
+def listToStringB (xs : List Imp) : String :=
   String.intercalate ", " (xs.map Imp.toStringBlocked)
+
+def Γ.ToString (xs : List Form) (bl : List Imp) : String := s!"{listToString xs}, {listToStringB bl}"
 
 end multiSucc

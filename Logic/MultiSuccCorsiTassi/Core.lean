@@ -18,7 +18,13 @@ deriving DecidableEq, Repr
 
 @[grind]
 structure Imp where
-  f  : Form
+  f : Form
+  g : Form
+deriving DecidableEq, Repr
+
+@[grind]
+structure ImpB where
+  f : Form
   g : Form
 deriving DecidableEq, Repr
 
@@ -33,18 +39,41 @@ infixl:60 " ⊃ " => Imp
 def Form.neg (a : Form) : Form :=  a ⊃ ⊥
 
 @[simp, grind]
-def Imp.toForm (i : Imp) : Form :=
-  i.f ⊃ i.g
+def Imp.toForm (i : Imp) : Form := i.f ⊃ i.g
 
-/- Using Multisets to not worry about order of forms -/
+
+/- /- Top-level change to add impB to Seq. Sequent element is either a form or a blocked imp type -/
+inductive SequentElem where
+| pure   : Form → SequentElem
+| blocked : Imp → SequentElem
+deriving DecidableEq, Repr
+
+@[simp]
+def SequentElem.toForm : SequentElem → Form
+| SequentElem.pure f   => f
+| SequentElem.blocked b => Imp.toForm b -/
+
+-- Using Multisets to not worry about order of forms
 @[grind]
 structure Sequent where
-  Γ : Multiset Form
+  Γa : Multiset Form
+  Γb : Multiset Imp
   Δ : Multiset Form
+
+def Sequent.Γ (s : Sequent) := s.Γa ∪ s.Γb.map Imp.toForm
+
+--TODO Sequent.normalize
+
+/- theorem Sequent.ext {s s' : Sequent} (hΓ : s.Γ = s'.Γ) (hΔ : s.Δ = s'.Δ) : s = s' := by
+  cases s; cases s'; simp_all [Γ];
+  constructor
+  . sorry
+  . sorry -/
+
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
-[x, y], [f1, f2], usable[imp1, imp2], nonusable[imp1, imp2] ⊢ [x, y], [g1, g2], usable[imp1, imp2], used[imp1, imp2]
+[x, y], [f1, f2], nonusable[imp1, imp2] ⊢ [x, y], [g1, g2], rightImp[imp1,imp2], used[imp1, imp2]
  -/
 @[grind]
 structure Seq4Proof where
@@ -69,7 +98,7 @@ def Form.encode : Form → List Nat
   | imp f g    => [4, (encode f).length] ++ encode f ++ encode g
 
 @[simp]
-def Imp.encode (x : Imp) : List Nat := x.f.encode ++ x.g.encode
+def Imp.encode (x : Imp) : List Nat := x.toForm.encode
 
 lemma Atom.ext {a b : Atom} (h : a.atom = b.atom) : a = b := by
   cases a; cases b
@@ -107,6 +136,12 @@ theorem form_inj {f : Form} (h : f.encode = g.encode) :
     have := List.append_inj_right h2 h1
     have hn := List.append_inj_left' h2 (congrArg List.length this)
     exact ⟨form_inj hn, form_inj this⟩
+
+lemma Imp.ext {a b : Imp} (h : a.encode = b.encode) : a = b := by
+  suffices a.toForm = b.toForm by grind [toForm]
+  apply form_inj
+  simp_all
+
 /-
   We can give a canonical ordering to `Form`s using our encodings
   Note that there is already an instance of `LinearOrder (List α)` in the library
@@ -119,6 +154,10 @@ instance : LinearOrder Form :=
 instance : LinearOrder Atom :=
   LinearOrder.lift' (fun a : Atom => a.atom) (fun _ _ h => Atom.ext h)
 
+instance : LinearOrder Imp :=
+  LinearOrder.lift' Imp.encode (fun _ _ h => Imp.ext h)
+
+--instance : LE (ImpB) where le f g := sorry
 /- `LinearOrder Nat` is already defined in the library
    But `Form` is our own type, so we need to give it one
    Since `Form` is made up of `Atom` and `Form`, we need to take into account both
@@ -141,11 +180,15 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 
 @[simp]
 def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
-  have ant := Multiset.ofList ((p.as.map .atoms) ++ p.fL ++ p.block.map Imp.toForm) --blocked is not apart of seq anymore, sperate for evaling refs
-  have succ := Multiset.ofList ((p.bs.map .atoms) ++ p.fR ++ p.impR.map Imp.toForm)  -- hist is to monitor R→ usage, not to display
-  ⟨ant, succ⟩
+  --have ant := Multiset.ofList ((p.as.map .atoms) ++ p.fL ++ (p.block.map ImpB.toForm) )
+  --have succ := Multiset.ofList ((p.bs.map .atoms) ++ p.fR ++ p.impR.map Imp.toForm)  -- hist is to monitor R→ usage, not to display
+  have antPure := Multiset.ofList ((p.as.map Form.atoms) ++ p.fL)
+  have antBlocked := Multiset.ofList p.block
+  have succ := Multiset.ofList ((p.bs.map Form.atoms) ++ p.fR ++ (p.impR.map Imp.toForm))
+  ⟨antPure, antBlocked, succ⟩
+
 
 def Sequent.toSeq4 (s : Sequent) : Seq4Proof :=
-Seq4Proof.mk [] (Multiset.sort s.Γ LE.le) [] [] (Multiset.sort s.Δ LE.le) [] []
+Seq4Proof.mk [] (Multiset.sort s.Γa LE.le) (Multiset.sort s.Γb LE.le) [] (Multiset.sort s.Δ LE.le) [] []
 
 end multiSucc
