@@ -22,9 +22,19 @@ match ref with
 | impr hs as bs ys bl pf prem =>
   let children : List Model := ys.attach.map (λ ⟨⟨a, b⟩, yh⟩ ↦ (prem a b yh ).getCM)
   let cUn := Models.getUnforced children
-  ⟨⟨as.toFinset, bs.toFinset ∪ cUn⟩, children⟩-- add children unforced to bs
+  ⟨⟨as.toFinset, bs.toFinset ∪ cUn⟩, children⟩
+  -- add children.unforced to bs. this is necessary bc without it you can't prove ref.getCM.wf. goal would be b ∈ bs which is not true
 
 
+@[simp, grind .]
+theorem Refutation.ant_atom_forced (r : Refutation s h)
+  (ha : Form.atoms a ∈ s.Γa) : a ∈ r.getCM.world.forced := by
+  induction r generalizing a <;> simp_all
+
+@[simp, grind .]
+theorem Refutation.ant_atom_unforced (r : Refutation s h)
+  (ha : Form.atoms a ∈ s.Δ) : a ∈ r.getCM.world.unforced := by
+  induction r generalizing a <;> simp_all
 /- def Result.getCMs (r : Result s b h) : List Model :=
 match r with
 | refutation rfs _ => rfs.map (λ rf ↦ Refutation.getCM rf )
@@ -34,13 +44,19 @@ match r with
 theorem Refutation.cm_wf (r : Refutation s h) : r.getCM.wf := by
   induction r <;> try (rw [Refutation.getCM]; assumption)
   . rw [Refutation.getCM, Model.wf]; simp
-  . rename_i i a ih; simp_all; rw [Model.wf]; simp;
-    intro m imp imp_in imp_m; let ⟨f,g⟩ := imp
-    specialize ih f g imp_in; --specialize a f g imp_in
-    simp_all; set r := a f g imp_in;
+  . rename_i hs as bs ys bl i prem ih; simp_all; rw [Model.wf]; simp;
+    intro m imp imp_in imp_m; let ⟨f,g⟩ := imp; subst_eqs; simp_all
+    specialize ih f g imp_in; --specialize prem f g imp_in
     constructor
-    . sorry
-    .  sorry
+    . intro a ha
+      have ha_forced : a ∈ (prem f g imp_in).getCM.world.forced := by
+          apply Refutation.ant_atom_forced (prem f g imp_in)
+          simp_all
+      exact ha_forced
+    . intro b hb
+      suffices mm : b ∈ Models.getUnforced (ys.attach.map (fun ⟨⟨a, b⟩, h⟩ => (prem a b h).getCM)) by simp_all
+      have hmem : b ∈ (prem f g imp_in).getCM.world.unforced := by grind
+      apply Models.getUnforced_elem (by grind) b hmem
 
 
 
@@ -70,8 +86,6 @@ theorem Refutation.afort_corr {hs : List Imp} {a b : Form}
   | impl₂ => simp_all
   | afort =>  simp_all
 
-@[simp]
-theorem evalAntB0 : ⋀* m, 0 = TV.t := by simp [evalAntB]
 
 theorem Refutation.correctness :
   ∀ (s : Sequent) ( r : Refutation s h) (_ : r.getCM.wf ),

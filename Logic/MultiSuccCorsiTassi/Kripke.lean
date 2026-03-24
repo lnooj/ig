@@ -45,6 +45,11 @@ def Models.getUnforced : List Model → Finset Atom
 | [] => {}
 | x :: xs => x.world.unforced ∪ Models.getUnforced xs
 
+@[grind ., simp]
+theorem Models.getUnforced_elem {ms : List Model} (mem: m ∈ ms):
+  ∀ a ∈ m.world.unforced, a ∈ Models.getUnforced ms := by
+  intro a ah; fun_induction getUnforced <;> grind
+
 def Model.depth : Model → Nat
 | ⟨_, branch⟩ =>
   1 + (branch.map Model.depth).max?.getD 0
@@ -72,6 +77,24 @@ decreasing_by
   grind
 
 
+@[grind ., simp]
+theorem Model.all_nested_in_all {m m' a : Model} (h₁ : a ∈ m.branch) (h₂ : m' ∈ a.all) : m' ∈ m.all := by
+  fun_induction Model.all m with
+  | case1 m ih => simp_all; right; grind
+
+@[grind ., simp]
+theorem Model.branch_wf {m m' : Model} (wf : m.wf) (mem : m' ∈ m.branch) : m'.wf := by rw [Model.wf] at wf; simp_all
+
+@[grind ., simp]
+theorem Model.all_wf {m m' : Model} (wf : m.wf) (mem : m' ∈ m.all) : m'.wf := by
+  fun_induction Model.all with
+  | case1 m ih =>
+    simp_all
+    rcases mem with h | ⟨a, h₁, h₂⟩
+    . grind
+    . rw [Model.wf] at wf
+      simp_all
+      apply ih a h₁ h₂
 
 
 /--Truth Value: true, false, unknown -/
@@ -182,6 +205,9 @@ scoped notation "⋀ " m:max ", " Γ:max => evalAnt Γ m
 def evalAntB (Γ : Multiset Imp) (m : Model) : TV :=
   (Γ.map (fun f => evalBlocked f m)).fold conjTV TV.t
 scoped notation "⋀* " m:max ", " Γ:max => evalAntB Γ m
+
+@[simp]
+theorem evalAntB0 : ⋀* m, 0 = TV.t := by simp [evalAntB]
 
 def evalSucc (Δ : Multiset Form) (m : Model) : TV :=
   (Δ.map (fun f => f.eval m)).fold disjTV TV.f
@@ -306,8 +332,8 @@ theorem eval_imp_true_iff :
   . intro h; rw [Form.eval]; simp_all
 
 theorem evalBlocked_true_iff :
-  evalBlocked ⟨a, b⟩ m = TV.t ↔
-    (m.branch.all (λ m' => (a ⊃ b).eval m' = .t)) := by
+  evalBlocked x m = TV.t ↔
+    (m.branch.all (λ m' => (x.f ⊃ x.g).eval m' = .t)) := by
   constructor
   . intro h; rw [evalBlocked] at h; simp_all only [List.all_eq_true, List.mem_attach,
     decide_eq_true_eq, forall_const, Subtype.forall]; grind [Form.eval]
@@ -323,8 +349,8 @@ theorem eval_imp_false_iff :
   . intro h; rw [Form.eval]; simp_all; grind
 
 theorem evalBlocked_false_iff :
-  evalBlocked ⟨a, b⟩ m = TV.f ↔
-    ∃ x ∈ m.branch, ((a ⊃ b).eval x = TV.f) := by
+  evalBlocked x m = TV.f ↔
+    ∃ m' ∈ m.branch, ((x.f ⊃ x.g).eval m' = TV.f) := by
   constructor
   . intro h; rw [evalBlocked] at h; simp_all; grind
   . intro h; rw [evalBlocked]; simp_all; grind
@@ -333,6 +359,11 @@ theorem eval_imp_righ_wo_ys :
   Sequent.eval { Γa := xs, Γb := xs', Δ := {a ⊃ b} } m ≠ TV.f →
   Sequent.eval { Γa := xs, Γb := xs', Δ := ↑((a ⊃ b) :: ys) } m ≠ TV.f := by
   simp; intro h₁ h₂; simp_all
+
+theorem eval_imp_righ_wo_ys_t :
+  Sequent.eval { Γa := xs, Γb := xs', Δ := {a ⊃ b} } m = TV.t →
+  Sequent.eval { Γa := xs, Γb := xs', Δ := ↑((a ⊃ b) :: ys) } m = TV.t := by
+  simp; intro h₁; grind
 
 @[grind ., simp]
 theorem eval_imp_false_contradict :
@@ -348,7 +379,14 @@ theorem eval_imp_false_contradict :
       obtain ⟨m'', ih⟩ := ih
       grind
 
+@[grind ., simp]
+theorem evalBlocked_imp_true_then {m m': Model}
+  (child : m' ∈ m.branch)
+  (h : evalBlocked x m = TV.t) : (x.f ⊃ x.g).eval m' = TV.t := by
+  simp_all [evalBlocked_true_iff]
 
+theorem mmmmm {bl : List Imp} :
+  ∀ x ∈ bl, evalBlocked x m = TV.t →  ∀ x ∈ bl, (x.f ⊃ x.g).eval m' = TV.t := by sorry
 --MONOTONICITY--
 
 /-
@@ -356,21 +394,6 @@ same as mode_branch_mono
 theorem mono_true_form {a : Form} {m : Model} :
   ( a.eval m = .t) → (∀ x ∈ m.branch, a.eval x = .t)  := by sorry -/
 
-@[grind ., simp]
-theorem Model.all_nested_in_all {m m' a : Model} (h₁ : a ∈ m.branch) (h₂ : m' ∈ a.all) : m' ∈ m.all := by
-  fun_induction Model.all m with
-  | case1 m ih => simp_all; right; grind
-
-@[grind ., simp]
-theorem Model.all_wf {m m' : Model} (wf : m.wf) (mem : m' ∈ m.all) : m'.wf := by
-  fun_induction Model.all with
-  | case1 m ih =>
-    simp_all
-    rcases mem with h | ⟨a, h₁, h₂⟩
-    . grind
-    . rw [Model.wf] at wf
-      simp_all
-      apply ih a h₁ h₂
 
 --TODO IMPORTANT
 @[grind ., simp]
@@ -467,6 +490,19 @@ theorem Model.mono_branch_false {f : Form} {m m' : Model}
     rw [eval_imp_false_iff]
     right
     use m'
+
+theorem eval_imp_righ_wo_ys' :
+  (∀ m' ∈ m.branch, Sequent.eval { Γa := xs, Γb := xs', Δ := {a ⊃ b} } m' ≠ TV.f) →
+  Sequent.eval { Γa := xs, Γb := xs', Δ := ↑((a ⊃ b) :: ys) } m ≠ TV.f := by
+  simp; intro h₁ h₂ h₃ h₄; simp [evalBlocked_true_iff] at h₃ h₁; rw [eval_imp_false_iff] at h₄
+  rcases h₄ with (⟨_, _⟩ | ⟨m', m'br, _ ⟩)
+  . sorry
+  sorry
+  /- rcases h₄ with (⟨_, _⟩ | ⟨m', m'br, _ ⟩)
+  . specialize h₁ m (by grind [Model.all]) h₂ h₃
+    grind
+  . specialize h₁ m' (by sorry) (by sorry) (by sorry)
+    contradiction -/
 
 /- theorem mono_false_all_branch {f : Form} {m m' a : Model}
   (wf : m.wf) (mem : a ∈ m.branch) (mem' : m' ∈ a.all ) (ftv : f.eval m' = .f)  :
