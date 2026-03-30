@@ -1,7 +1,6 @@
 import Logic.MultiSuccCorsiTassi.Core
 import Logic.MultiSuccCorsiTassi.Syntax
 import Logic.MultiSuccCorsiTassi.Helper
-import Logic.MultiSuccCorsiTassi.Display
 import Logic.MultiSuccCorsiTassi.Kripke
 
 namespace multiSucc
@@ -77,64 +76,5 @@ inductive Refutation : Sequent → (hs : List Imp) → Type
       Refutation ⟨↑(xs), ↑bl, ↑(b :: ys)⟩ hs →
       Refutation ⟨↑(xs), ↑bl, ↑((a ⊃ b) :: ys)⟩ hs
 
-def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refutation xseq h → String
-| .ax h as bs bl _ =>
-  indent indentLvl s!"AX: {listToString (as.map Form.atoms) ++ listToStringB bl} , ⊬ {listToString (bs.map Form.atoms)}"
-| .botr h xs ys bl proof =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine :=
-  s!"⊥R: {Γ.ToString xs bl}  ⊬ ⊥, {listToString ys}"
-  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .andl h a b xs ys bl proof =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L: {a} ∧ {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
-  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .andr₁ h a b xs ys bl proof =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L: {Γ.ToString xs bl} ⊬ {a} ∧ {b}, {listToString ys}"
-  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .andr₂ h a b xs ys bl proof =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L: {Γ.ToString xs bl} ⊬ {a} ∧ {b}, {listToString ys}"
-  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .orl₁ h a b xs ys bl proof =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!" ∨R: {a} ∨ {b}, {Γ.ToString xs bl} ⊬  {listToString ys}"
-  s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .orl₂ h a b xs ys bl proof =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!" ∨R: {a} ∨ {b}, {Γ.ToString xs bl} ⊬  {listToString ys}"
-  s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .orr h a b xs ys bl proof =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!" ∨R: {Γ.ToString xs bl} ⊬ {a} ∨ {b}, {listToString ys}"
-  s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .impl₁ h a b xs ys bl proof =>
-  let premise  := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→L: {a} → {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
-  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .impl₂ h a b xs ys bl proof =>
-  let premise  := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→L: {a} → {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
-  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .impr h as bs ys bl _ proof  =>
-  let premise := ys.attach.map (λ ⟨⟨a, b⟩, h⟩ ↦ refutationToString (indentLvl + 1) (proof a b h) ) --refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→R: {listToString (as.map .atoms) ++ listToStringB bl} ⊬ {listToString (bs.map .atoms) ++ listToString (ys.map Imp.toForm)}"
-  s!"{ premise.map (λ pre ↦ pre ++ "\n")}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-| .afort h a b xs ys bl _ proof  =>
-  let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→AF: {Γ.ToString xs bl} ⊬ {a} → {b}, {listToString ys}"
-  s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
-
-
-
-
-def listRefutationToString : List (Refutation xseq h) → String
-| [] => ""
-| x::xs => (refutationToString 0 x).replace " ," "" ++ "\n \n" ++ listRefutationToString xs
-
-
-instance : ToString (List (Refutation xseq h)) where
-  toString proof := listRefutationToString proof
 
 end multiSucc

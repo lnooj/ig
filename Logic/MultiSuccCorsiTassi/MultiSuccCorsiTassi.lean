@@ -16,7 +16,7 @@ import Logic.MultiSuccCorsiTassi.Core
 import Logic.MultiSuccCorsiTassi.Proof
 import Logic.MultiSuccCorsiTassi.Syntax
 import Logic.MultiSuccCorsiTassi.Helper
---import Logic.MultiSuccCorsiTassi.Display
+import Logic.MultiSuccCorsiTassi.Display
 import Logic.MultiSuccCorsiTassi.Kripke
 import Logic.MultiSuccCorsiTassi.Refutation
 
@@ -148,6 +148,24 @@ theorem choices_eq_nil {xs : List (List α)} : choices xs = [] ↔ xs = [] ∨ [
   | case2 => simp
   | case3 => simp_all; grind
 
+@[grind ., simp]
+theorem mem_of_mem_choices {xss : List (List α)} {xs : List α} {c : List α}
+  (hc : c ∈ choices xss) (hxs : xs ∈ xss) : ∃ x ∈ xs, x ∈ c := by
+  induction xss generalizing c with
+  | nil =>
+      cases hxs
+  | cons x xss ih =>
+      cases xss with
+      | nil =>
+          simp [choices] at hc hxs
+          rcases hc with ⟨y, hy, rfl⟩
+          subst hxs
+          exact ⟨y, hy, by simp⟩
+      | cons y ys =>
+          rw [choices] at hc
+          simp_all
+          grind
+
 /-- Picks only proofs (α) if any, else returns all the refutations (β)
 if .inl (proof) is returned, it is never empty, if .inr is returned, it is the length of the original input list -/
 def pickProof : List (α ⊕ β) → List (α) ⊕ List (β)
@@ -177,10 +195,106 @@ theorem pickProof_eq_inr {xs : List (α ⊕ β)} {ys : List β} :
 
 
 
+theorem subtype_val_flatten_notEmpty
+(pf : List { pfs // pfs ≠ [] })
+(h : pickProof impRApplications = Sum.inl pf)
+: (List.map Subtype.val pf).flatten ≠ [] := by
+  simp [pickProof_eq_inl] at h
+  rcases h with ⟨h₁, h₂⟩
+  cases pf with
+  | nil =>
+      cases h₂ rfl
+  | cons x xs => simp [x.property]
+
+@[grind ., simp]
+theorem List.findSome?_ne_none_of_mem {xs : List α} {f : α → Option β} {x : α}
+  (hx : x ∈ xs) (hfx : f x ≠ none) : xs.findSome? f ≠ none := by grind
 
 
 lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
+@[grind ., simp]
+theorem Subtype.prop_map
+(rfs : List { rf : List ((a : Form) ×
+          (b : Form) ×
+            Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+              ({ f := a, g := b } :: hist)) // rf ≠ [] }) : [] ∉ rfs.unattach := by
+  simp_all only [ne_eq, List.mem_unattach, not_true_eq_false, IsEmpty.exists_iff, not_false_eq_true]
+
+theorem stupid
+(rfs : List { rf // rf ≠ [] })
+(rfs_ne_empt : rfs ≠ []) -- how to get this
+(choices : List
+  (List
+    ((a : Form) ×
+      (b : Form) ×
+        Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+          ({ f := a, g := b } :: hist))) := multiSucc.choices (List.map Subtype.val rfs))
+(ruleR : ((a b : Form) →
+    { f := a, g := b } ∈ impR →
+      Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+        ({ f := a, g := b } :: hist)) →
+  Refutation
+    { Γa := ↑(List.map Form.atoms as), Γb := ↑block, Δ := ↑(List.map Form.atoms bs ++ List.map Imp.toForm impR) } hist)
+(metaR1 : impR ∩ hist = [])
+
+(impRApplications : List ({pf : List (Proof ⟨↑(as.map Form.atoms), ↑block, ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
+                  {rf : List ((a b : Form) × Refutation ⟨↑(a :: as.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
+                ))
+(hpick_inr : impRApplications = List.map Sum.inr rfs)
+: (multiSucc.choices (List.map Subtype.val rfs)).attach ≠ [] := by
+--intro a
+rw [List.attach_ne_nil_iff]
+have : choices =  multiSucc.choices (List.map Subtype.val rfs) := by sorry
+have : multiSucc.choices (List.map Subtype.val rfs) = [] ↔ (List.map Subtype.val rfs) = [] ∨ [] ∈ (List.map Subtype.val rfs) :=
+      choices_eq_nil
+simp_all; clear this
+have :  [] ∉ rfs.unattach := Subtype.prop_map rfs
+intro b -- need to show that impRapplication it has to return a list that is not empty itself (we know that elements are not empty lists)
+sorry
+
+@[grind .]
+theorem impR_cap
+(block : List Imp)
+(hist : List Imp)
+(impRH : Imp)
+(impRT : List Imp)
+(ha : { f := f, g := g } ∈ (impRH :: impRT))
+: insert { f := f, g := g }
+    (collectImpsForm f ∪
+      ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪ (collectImpsForm g ∪ hist.toFinset))) ⊆
+  insert impRH
+    (block.toFinset.biUnion collectImpsImp  ∪
+      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ∪ hist.toFinset)))) := by
+  have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆
+                   insert impRH (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ))) := by
+                  intro x hx
+                  simp at hx
+                  rcases hx with head | tail₁ | tail₂
+                  . simp_all; grind
+                  . simp_all; grind
+                  . simp_all; grind
+  have eq : (block).toFinset.biUnion collectImpsImp = (block.map Imp.toForm).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
+  intro x hx
+  simp only [Finset.mem_insert, Finset.mem_union] at hx ⊢
+  rcases hx with hhead | hcf | hblock | hcg | hhist
+  · have hinc : x ∈ insert impRH
+      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp))) := by
+      exact inclusion (by simp [hhead])
+    simp only [Finset.mem_insert, Finset.mem_union] at hinc
+    grind
+  · have hinc : x ∈ insert impRH
+      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp))) := by
+      exact inclusion (by simp [hcf])
+    simp only [Finset.mem_insert, Finset.mem_union] at hinc
+    grind
+  · grind
+  · have hinc : x ∈ insert impRH
+      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp))) := by
+      exact inclusion (by simp [hcg])
+    simp only [Finset.mem_insert, Finset.mem_union] at hinc
+    grind
+  · grind
 /- METARULES
 1. formula x can be principal of R→ (impr) only once
    - so whenever we apply R→ rule, we place it to the succedent used imp list
@@ -215,46 +329,44 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
             let rule := [ax hist as bs block (by grind)]
             exact Result.refutation rule (by grind)
           --METARULE 1 NONINVERTABLE REEGEL
-          | impR => by
+          | impRH :: impRT => by
+            let impR := impRH :: impRT
             simp only [Seq4Proof.toSeq, List.append_nil]
             let impRApplications :
             -- find either a list of proofs for any of the imps, if none found, get the function required to get ALL refutations
-                List (List (Proof ⟨↑(as.map Form.atoms), ↑block, ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩)  ⊕
-                      List ((a b : Form) × Refutation ⟨↑(a :: as.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩  (⟨a,b⟩ :: hist))) :=
+                List (
+                  {pf : List (Proof ⟨↑(as.map Form.atoms), ↑block, ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
+                  {rf : List ((a b : Form) × Refutation ⟨↑(a :: as.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
+                ) :=
               impR.attach.map (λ (⟨⟨f, g⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦
-                have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆   impR.toFinset.biUnion collectImpsImp := by
-                  intro x hx
-                  apply Finset.mem_biUnion.mpr
-                  refine ⟨⟨f,g⟩, by simpa using ha, ?_⟩
-                  simp [collectImpsImp] at hx ⊢
-                  exact hx
-                have eq : (block).toFinset.biUnion collectImpsImp = (block.map Imp.toForm).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
-
                 have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
-                                                (by grw [← hcap]; simp; apply Finset.card_le_card ?_; grind) (by simp)
+                                                (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
                 let xs := as.map Form.atoms; let ys := bs.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
                 have ruleP := impr f g xs ys block
-                --have ruleR := (Refutation.impr block hist as bs impR (by grind))
                 match premise with
-                | .proof pf neqE => .inl (pf.map (λ p ↦ (ruleP p.castSeq).castSeq))
-                | .refutation rf neqE => .inr (rf.map (λ p ↦ ⟨ f, g , p.castSeq⟩))
-                --(premise.castSeq.map (b := []) (h := ⟨f, g⟩ :: hist) block hist ruleP (λ r ↦ (ruleR r).castSeq)).castSeq
+                | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
+                | .refutation rf neqE => .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩), by simpa using neqE⟩
               )
+            have neq_empt : impRApplications ≠ [] := by
+              simp [impRApplications]
             let res := pickProof impRApplications
+
             --let neqE : impRApplications.filterMap Sum.getLeft? = some ys
-            match _ : pickProof impRApplications with
-            | .inl pf => exact Result.proof pf.flatten (by simp_all; rename_i h; sorry )
+            match hpick : pickProof impRApplications with
+            | .inl pf => exact Result.proof (pf.map Subtype.val |>.flatten) (by grind [subtype_val_flatten_notEmpty])
             | .inr rfs =>
-              have choices := choices rfs --all dif ways to construct refutation
+              let choices := choices (rfs.map Subtype.val) --all dif ways to construct refutation
               have ruleR := (Refutation.impr hist as bs impR block (by grind)) --new parent to choices
+              have hpick_inr : impRApplications = rfs.map Sum.inr := by
+                simpa using (pickProof_eq_inr.mp hpick)
               exact .refutation (choices.attach.map (λ ⟨c, h⟩ ↦
                                                 ruleR (λ a b hab ↦
-                                                  (c.findSome? (λ ⟨a', b', r'⟩ ↦ -- find the same imp in child as in parent
-                                                    if _ : a = a' ∧ b = b'
-                                                      then some (r'.castSeq (hb := by grind) (hh := by grind) (hc := by grind))
-                                                    else none)).get sorry)--prove that same imps can be found in choices as in parent
+                                                      (c.findSome? (λ ⟨a', b', r'⟩ ↦ -- find the same imp in child as in parent
+                                                        if _ : a = a' ∧ b = b'
+                                                          then some (r'.castSeq (hb := by grind) (hh := by grind) (hc := by grind))
+                                                        else none)).get sorry)--prove that same imps can be found in choices as in parent
                                                     )
-                                ) (by simp_all; intro a; sorry)
+                                ) (by sorry)--(by simp; intro a; rw [List.attach_eq_nil_iff, choices_eq_nil] at a; simp_all;  sorry)
         | xs@(_::_) => by
           --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
           --have corr := findIntersCorr as bs

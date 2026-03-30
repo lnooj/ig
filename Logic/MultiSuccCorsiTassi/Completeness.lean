@@ -14,10 +14,13 @@ match ref with
 | ax hs as bs bl pf => ⟨⟨as.toFinset, bs.toFinset⟩, []⟩
 | botr hs xs ys bl prem
 | andl hs a b xs ys bl prem
-| andr₁ hs a b xs ys bl prem | andr₂ hs a b xs ys bl prem
-| orl₁ hs a b xs ys bl prem | orl₂ hs a b xs ys bl prem
+| andr₁ hs a b xs ys bl prem
+| andr₂ hs a b xs ys bl prem
+| orl₁ hs a b xs ys bl prem
+| orl₂ hs a b xs ys bl prem
 | orr hs a b xs ys bl prem
-| impl₁ hs a b xs ys bl prem | impl₂ hs a b xs ys bl prem
+| impl₁ hs a b xs ys bl prem
+| impl₂ hs a b xs ys bl prem
 | afort hs a b xs ys bl pf prem => prem.getCM
 | impr hs as bs ys bl pf prem =>
   let children : List Model := ys.attach.map (λ ⟨⟨a, b⟩, yh⟩ ↦ (prem a b yh ).getCM)
@@ -60,14 +63,17 @@ theorem Refutation.cm_wf (r : Refutation s h) : r.getCM.wf := by
 
 
 
-theorem Refutation.afort_corr {hs : List Imp} {a b : Form}
+/- theorem Refutation.hist_corr {hs : List Imp} {a b : Form}
   (pf : { f := a, g := b } ∈ hs)
   (r : Refutation s hs )
   (wf : r.getCM.wf)
   --(hΔ : s.Δ = ↑((a ⊃ b) :: ys))
   : a.eval r.getCM = .t := by
   induction r  with
-  | ax => simp_all; sorry
+  | ax =>
+    simp_all
+    sorry
+
   | botr => simp_all
   | andl => simp_all
   | andr₁ => simp_all
@@ -84,7 +90,7 @@ theorem Refutation.afort_corr {hs : List Imp} {a b : Form}
     sorry--let := Model.momo_branch_true wf (by sorry) (by sorry)
   | impl₁ => simp_all
   | impl₂ => simp_all
-  | afort =>  simp_all
+  | afort =>  simp_all -/
 
 
 theorem Refutation.correctness :
