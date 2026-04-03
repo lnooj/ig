@@ -37,10 +37,10 @@ infixl:60 " ⊃ " => Imp
 
 /- Defining negation as → ⊥  from the getgo-/
 def Form.neg (a : Form) : Form :=  a ⊃ ⊥
+lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 @[simp, grind]
 def Imp.toForm (i : Imp) : Form := i.f ⊃ i.g
-
 
 /- /- Top-level change to add impB to Seq. Sequent element is either a form or a blocked imp type -/
 inductive SequentElem where

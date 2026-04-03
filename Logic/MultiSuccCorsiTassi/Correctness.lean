@@ -40,7 +40,7 @@ theorem proof_correctness :
   intro s pf m wf
   induction pf generalizing m with
   | ax x xs ys bl hxs hys =>
-    simp only [ne_eq, Sequent.eval_false_iff, Classical.not_and_iff_not_or_not]
+    simp
     have hxsM : Form.atoms x ∈ (↑xs : Multiset Form) := by simpa
     if xtv : x ∈ m.world.forced then
       suffices evalSucc ↑ys m = TV.t by grind
@@ -60,48 +60,21 @@ theorem proof_correctness :
     grind
   | orr a b xs ys prem =>
     simp_all
-  | impr a b xs ys bl prem ih => --tahame et a b oleks t,a on f u, b t, u
-    --specialize ih m wf
+  | impr a b xs ys bl prem ih =>
     apply eval_imp_righ_wo_ys
-
-    simp_all --ih gives that b cant be false. ys throw away. ih on ms children as well to show that future imp is false
-    intro h₁ h₂ impF
-    rw [eval_imp_false_iff] at impF
-
-    have wf' :=  wf
-    rw [Model.wf] at wf'
     simp_all
-
-    rcases impF with ⟨att, bf⟩ | ⟨m', br,impF⟩
-    . --have : m.branch = [] := by sorry
-      --simp_all
-      have ih' := ih m wf att
-      contrapose! ih'
-      simp_all
-      rintro x (_ | ⟨x, xbl, _, _⟩)
-      . grind [Model.mono_all_true]
-      . specialize h₂ x xbl
-        rw [evalBlocked_true_iff] at h₂
-        simp at h₂
-
-
-    . specialize ih m' (by sorry)
-      sorry
-/-     apply eval_imp_false_contradict at impF
+    intro h₁ h₂ impF
+    apply eval_imp_false_contradict at impF
     rcases impF with ⟨m', m'_in, h₃, h₄⟩
     specialize ih m' (by grind) h₃
     simp_all
-    rcases ih with ⟨x, (_ | ⟨x , xbl, _, _⟩), xeval⟩
+    rcases ih with ⟨x, (_ | ⟨x, xbl, _, _⟩), xeval⟩
     . grind [Model.mono_all_true]
     . clear h₁ h₃ h₄
-      specialize h₂ x xbl
       contrapose xeval
-      rw [Model.all] at m'_in; simp_all
-      rcases m'_in with parent | ⟨br, brc, brall⟩
-      . sorry
-      . specialize h₂ br brc
-        apply Model.mono_all_true (by rw [Model.wf] at wf; simp at wf; grind) brall h₂
- -/
+      specialize h₂ x xbl
+      sorry
+      --exact evalBlocked_true_in_branch (i := x) (m := m) (m' := m') wf m'_in h₂
 
   | impl a b xs ys bl prem1 prem2 ih₁ ih₂ =>
     simp_all
@@ -150,12 +123,11 @@ theorem proof_correctness' :
     simp_all; specialize ih m wf; grind
   | orr a b xs ys bl prem ih =>
     simp_all; specialize ih m wf; grind
-  | impr a b xs ys bl prem ih => --tahame et a b oleks t,a on f u, b t, u
-    --specialize ih m wf
+  | impr a b xs ys bl prem ih =>
     apply eval_imp_righ_wo_ys_t
     simp_all
     have ih' := ih m wf
-    rcases ih' with (h₁ | ⟨x, h₂, xtv⟩ ) | h₂
+    rcases ih' with (h₁ | ⟨x, h₂, xtv⟩) | h₂
     . right
       rw [eval_imp_true_iff]
       simp_all
@@ -178,32 +150,39 @@ theorem proof_correctness' :
 
   | impl a b xs ys bl prem1 prem2 ih₁ ih₂ =>
     simp_all
-    specialize ih₁ m wf; specialize ih₂ m wf
-    rcases ih₁ with (ih₁ | (ih₁ | ih₁) )| ih₁ | ih₁
-    . left; left; right
-      simp_all
-    . sorry
-
-    left; left; left
-    rw [eval_imp_false_iff]
-    intro h₁ h₂
-    have impT := h₁
-    rw [eval_imp_true_iff] at h₁
-    simp at h₁
-    cases h₁ with
-    | intro himp hbranch =>
-      cases himp with
-      | inl h =>
-        intro hbl
-        apply ih₁ <;> try grind [evalBlocked_true_iff]
-      | inr h => simp_all
+    specialize ih₁ m wf
+    specialize ih₂ m wf
+    rcases ih₂ with h₂ | hys
+    · rcases h₂ with hbf | hbl
+      · rcases hbf with hb | hxs
+        · rcases ih₁ with h₁ | hys
+          · rcases h₁ with hxs | himp | hbl
+            · exact Or.inl <| Or.inl <| Or.inr hxs
+            · have hImpF : (a ⊃ b).eval m = TV.f := by
+                rw [eval_imp_false_iff]
+                right
+                exact (evalBlocked_false_iff (x := ⟨a, b⟩) (m := m)).1 himp
+              exact Or.inl <| Or.inl <| Or.inl hImpF
+            · exact Or.inl <| Or.inr hbl
+          · rcases hys with hat | hys
+            · have hImpF : (a ⊃ b).eval m = TV.f := by
+                rw [eval_imp_false_iff]
+                left
+                exact ⟨hat, hb⟩
+              exact Or.inl <| Or.inl <| Or.inl hImpF
+            · exact Or.inr hys
+        · exact Or.inl <| Or.inl <| Or.inr hxs
+      · exact Or.inl <| Or.inr hbl
+    · exact Or.inr hys
 
   | afort a b xs ys bl prem ih =>
     simp_all
     specialize ih m wf
-    rcases ih with (ih₁ | ( ih₁) )| ih₁ | ih₁
+    rcases ih with (ih₁ | ih₁) | ih₁ | ih₁
     . left; left; apply_assumption
     . left; right; apply_assumption
     . right; left
       apply b_true_then_imp_true_branch wf ih₁
     . right; right; apply_assumption
+
+end multiSucc

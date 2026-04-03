@@ -45,31 +45,46 @@ def size_sum_increased : List Form → Nat
 - n is the complexity of the set of forms that can be used as principle to any rule
 -/
 @[grind]
-structure Weight (cap : ℕ) where
-  r : ℕ
+structure Weight where
+  cap_r : ℕ
   n : ℕ
-  hr : r ≤ cap
+  --hr : r ≤ cap
 
 namespace Weight
 
 @[grind]
-def lt (a b : Weight cap) := a.r > b.r ∨ a.r = b.r ∧ a.n < b.n
+def lt (a b : Weight ) := a.cap_r < b.cap_r ∨ a.cap_r = b.cap_r ∧ a.n < b.n
 
 @[simp]
-instance instLT (cap : ℕ) : LT (Weight cap) where lt := lt
+instance instLT : LT (Weight ) where lt := lt
 
 @[grind =]
-theorem lt_iff {a b : Weight cap} : a < b ↔ a.lt b := by rfl
+theorem lt_iff {a b : Weight } : a < b ↔ a.lt b := by rfl
 
 @[simp, grind]
-instance instWellFoundedRelation {cap : ℕ} : WellFoundedRelation (Weight cap) where
+theorem mk_lt_mk {a₁ a₂ b₁ b₂ : ℕ} :
+    ({ cap_r := a₁, n := a₂ } : Weight) < { cap_r := b₁, n := b₂ }
+      ↔ a₁ < b₁ ∨ a₁ = b₁ ∧ a₂ < b₂ := by
+  rfl
+
+@[simp]
+theorem lt_toLex_iff (a b : Weight) :
+  ((toLex (a.cap_r, a.n) : ℕ ×ₗ ℕ) < (toLex (b.cap_r, b.n) : ℕ ×ₗ ℕ)) ↔ a < b := by
+  simpa [Weight.lt] using
+    (Prod.Lex.toLex_lt_toLex
+      (x := (a.cap_r, a.n)) (y := (b.cap_r, b.n)))
+
+@[simp, grind]
+instance instWellFoundedRelation : WellFoundedRelation (Weight ) where
   rel a b := a < b
   wf := by
-    let rel' : WellFoundedRelation (Weight cap) :=
-      invImage (fun x ↦ ⟨cap - x.r, x.n⟩) Prod.instWellFoundedRelation
-    convert rel'.wf with a b
-    simp only [WellFoundedRelation.rel, rel']
-    grind [InvImage, Nat.lt_wfRel, sizeOf_nat]
+    let r : Weight → Weight → Prop :=
+      InvImage (fun x y : ℕ ×ₗ ℕ => x < y) (fun x : Weight ↦ (toLex (x.cap_r, x.n) : ℕ ×ₗ ℕ))
+    have hrel : r = fun a b => a < b := by
+      funext a b
+      simp [r, lt_toLex_iff]; sorry
+    have wf' : WellFounded r := InvImage.wf _ wellFounded_lt
+    simpa [hrel] using wf'
 
 
 end Weight
@@ -112,19 +127,30 @@ theorem Seq4Proof.r_subset_cap (p : Seq4Proof) : p.r ⊆ p.cap := by simp only [
 - sixeOf_Form is used, not complexity, for some cases this doesn't change
 - the forms list size must be higher than the imp lists, for in our recursive calls we might only move the implications to appropriate lists,
   functionally doing nothing but it still must decrease. atoms donn't make a difference here -/
-def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ) (hcap : p.cap.card ≤ cap) : Weight cap :=
-let r := p.r.card
+def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ)  : Weight :=
+let r := cap - p.r.card
 let n :=
       let cL := size_sum p.fL--(countPrinciple forms₁ blocked)-- forms in blocked can not be principle PRINCIPLE LOGIC NOT USED
       let cR := size_sum_increased p.fR --any imp on right side can be principle, bc either a fort is used or R→
       --let cImpL := size_sum imps₁
       let cImpR := size_sum (p.impR.map Imp.toForm)
       cL + cR + cImpR--+ cImpL + cImpR
-let h : p.r.card ≤ p.cap.card := by
+/- let h : p.r.card ≤ p.cap.card := by
   simp only [Seq4Proof.cap, Finset.union_assoc, Seq4Proof.r];
   apply (Finset.card_le_card ?_); grind
-let hr : p.r.card ≤ cap :=  Nat.le_trans h hcap
-{ r, n := n, hr }
+let hr : p.r.card ≤ cap :=  Nat.le_trans h hcap -/
+{ cap_r := r , n := n}
+
+@[simp, grind]
+theorem Seq4Proof.weight_cap_r (p : Seq4Proof) (cap : ℕ) :
+    (p.weight cap).cap_r = cap - p.r.card := by
+  simp [Seq4Proof.weight]
+
+@[simp, grind]
+theorem Seq4Proof.weight_n (p : Seq4Proof) (cap : ℕ) :
+    (p.weight cap).n =
+      size_sum p.fL + size_sum_increased p.fR + size_sum (p.impR.map Imp.toForm) := by
+  simp [Seq4Proof.weight]
 
 
 

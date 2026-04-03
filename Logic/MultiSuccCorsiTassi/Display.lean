@@ -74,7 +74,7 @@ def listToStringB (xs : List Imp) : String :=
 
 def Γ.ToString (xs : List Form) (bl : List Imp) : String := s!"{listToString xs}, {listToStringB bl}"
 
-
+def listModelToString (ms : List Model) : String := String.intercalate "\n \n" (ms.map mToString)
 
 /-! # Proof display -/
 

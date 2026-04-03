@@ -19,6 +19,7 @@ import Logic.MultiSuccCorsiTassi.Helper
 import Logic.MultiSuccCorsiTassi.Display
 import Logic.MultiSuccCorsiTassi.Kripke
 import Logic.MultiSuccCorsiTassi.Refutation
+import Logic.MultiSuccCorsiTassi.Completeness
 
 @[grind =]
 theorem List.prodcut_eq_nil {α β : Type u} {xs : List α} {ys : List β} :
@@ -211,8 +212,6 @@ theorem List.findSome?_ne_none_of_mem {xs : List α} {f : α → Option β} {x :
   (hx : x ∈ xs) (hfx : f x ≠ none) : xs.findSome? f ≠ none := by grind
 
 
-lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
-
 @[grind ., simp]
 theorem Subtype.prop_map
 (rfs : List { rf : List ((a : Form) ×
@@ -295,6 +294,56 @@ theorem impR_cap
     simp only [Finset.mem_insert, Finset.mem_union] at hinc
     grind
   · grind
+
+theorem hist_card_drop_of_impR_step
+  (block hist : List Imp)
+  (impRH : Imp)
+  (impRT : List Imp)
+  (cap : ℕ)
+  {f g : Form}
+  (ha : { f := f, g := g } ∈ (impRH :: impRT))
+  (hcap :
+    (insert impRH
+      (block.toFinset.biUnion collectImpsImp ∪
+        (collectImpsForm impRH.f ∪
+          (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ∪ hist.toFinset))))).card ≤ cap)
+  (metaR1 : (impRH :: impRT) ∩ hist = [])
+  : cap - (insert { f := f, g := g } hist.toFinset).card < cap - hist.toFinset.card := by
+  have hx : { f, g } ∉ hist := by
+    intro hmem
+    have : { f, g } ∈ (impRH :: impRT) ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
+    simpa [metaR1] using this
+  have hxFin : { f, g } ∉ hist.toFinset := by simpa using hx
+  have hsubset :
+      insert { f := f, g := g }
+          (collectImpsForm f ∪
+            ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪
+              (collectImpsForm g ∪ hist.toFinset))) ⊆
+        insert impRH
+          (block.toFinset.biUnion collectImpsImp ∪
+            (collectImpsForm impRH.f ∪
+              (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ∪ hist.toFinset)))) :=
+    impR_cap block hist impRH impRT ha
+  have hle : (insert { f := f, g := g } hist.toFinset).card ≤ cap := by
+    have hmem :
+        insert { f := f, g := g } hist.toFinset ⊆
+          insert { f := f, g := g }
+            (collectImpsForm f ∪
+              ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪
+                (collectImpsForm g ∪ hist.toFinset))) := by
+      intro x hx
+      simp only [Finset.mem_insert, Finset.mem_union] at hx ⊢
+      rcases hx with rfl | hx
+      · simp
+      · simp [hx]
+    exact le_trans (Finset.card_le_card (hmem.trans hsubset)) hcap
+  have hsucc : (insert { f, g } hist.toFinset).card = hist.toFinset.card + 1 := by
+    exact Finset.card_insert_of_notMem hxFin
+  have hlt : hist.toFinset.card < cap := lt_of_lt_of_le (by simpa [hsucc]) hle
+  rw [hsucc, Nat.sub_add_eq]
+  simpa using Nat.sub_lt (Nat.sub_pos_of_lt hlt) (by decide : 0 < 1)
+
+
 /- METARULES
 1. formula x can be principal of R→ (impr) only once
    - so whenever we apply R→ rule, we place it to the succedent used imp list
@@ -443,18 +492,38 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
       have ruleP := impl a b xs ys block; have ruleR₁ := impl₁ hist a b xs ys block; have ruleR₂ := impl₂ hist a b xs ys block
       (Result.map2proof (premise₁.castSeq) premise₂.castSeq ruleP ruleR₁ ruleR₂).castSeq
 
-termination_by s.weight cap hcap
+termination_by s.weight cap
 decreasing_by
-all_goals simp_all [Seq4Proof.weight, Weight.lt_iff]; try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT];
-. have hx : { f, g} ∉ hist := by
-    intro hmem
-    have : { f, g} ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
-    simp_all
-  have hxFin : { f, g} ∉ hist.toFinset := by simp; exact hx
-  have hcard : hist.toFinset.card < (insert { f, g} hist.toFinset).card := by
-    have : (insert { f, g} hist.toFinset).card = hist.toFinset.card + 1 := Finset.card_insert_of_notMem hxFin
-    grind
-  grind
+  all_goals
+    simp_all only [Seq4Proof.weight, Seq4Proof.cap, Seq4Proof.r, Weight.lt_iff, Weight.lt]
+    simp_all only [Finset.union_assoc, List.empty_eq, List.toFinset_nil, Finset.biUnion_empty, Finset.empty_union,
+      Finset.union_empty, List.toFinset_cons, Finset.biUnion_insert, collectImpsImp, Finset.singleton_union,
+      Finset.insert_union, Finset.union_insert, size_sum, size_sum_increased, add_zero, List.map_nil, size_sum.eq_1,
+      List.map_cons, Imp.toForm, size_sum.eq_2, sizeOf_Form, zero_add]
+    try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT]
+    try linarith
+  · left
+    simpa [impR] using hist_card_drop_of_impR_step block hist impRH impRT cap ha hcap metaR1
+  · left
+    /- have hle : (insert { f := f, g := g } hist.toFinset).card ≤ cap := by
+      have hmem :
+          insert { f := f, g := g } hist.toFinset ⊆
+            insert { f := f, g := g }
+              (collectImpsForm f ∪
+                ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪
+                  (collectImpsForm g ∪ hist.toFinset))) := by
+        intro x hx
+        simp only [Finset.mem_insert, Finset.mem_union] at hx ⊢
+        rcases hx with rfl | hx
+        · simp
+        · simp [hx]
+      exact le_trans (Finset.card_le_card (hmem.trans hsubset)) hcap -/
+    have : hist.toFinset.card ≤ cap := by simp_all; sorry
+    sorry
+    --exact hist_card_drop_of_impR_step block hist impRH impRT cap (by grind) hcap metaR1
+  · left
+    sorry
+    --exact hist_card_drop_of_impR_step block hist impRH impRT cap (by grind) hcap metaR1
 
 
 def automatedProofHelper (s : Sequent) : Std.Format :=
@@ -462,7 +531,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
   match res with
   | .proof ps _ =>  dbg_trace s!"have proof {ps.length}"; String.toFormat (listProofToString ps)
-  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf)
+  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf ++ listModelToString (rf.map (λ r ↦ r.getCM)))
 
 --modusponens "a → b, a ⊢ β"
 #eval! automatedProofHelper (seq {(p → q), p ⊢ q})

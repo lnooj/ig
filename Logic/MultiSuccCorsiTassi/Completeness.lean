@@ -138,7 +138,8 @@ theorem Refutation.correctness :
     simp_all
     rcases ih with ⟨h₁, h₂, h₃⟩
     rw [eval_imp_false_iff]; simp_all; left
-    have a_in_xs := Refutation.afort_corr pf prem
-    grind
+    sorry
+    --have a_in_xs := Refutation.afort_corr pf prem
+    --grind
 
 end multiSucc
