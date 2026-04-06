@@ -12,20 +12,9 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Union
 import Mathlib.Data.Finset.Card
 
-import Logic.MultiSuccCorsiTassi.Core
-import Logic.MultiSuccCorsiTassi.Proof
-import Logic.MultiSuccCorsiTassi.Syntax
-import Logic.MultiSuccCorsiTassi.Helper
 import Logic.MultiSuccCorsiTassi.Display
-import Logic.MultiSuccCorsiTassi.Kripke
-import Logic.MultiSuccCorsiTassi.Refutation
 import Logic.MultiSuccCorsiTassi.Completeness
-
-@[grind =]
-theorem List.prodcut_eq_nil {α β : Type u} {xs : List α} {ys : List β} :
-    xs.product ys = [] ↔ xs = [] ∨ ys = [] := by
-  simp [product]; cases xs with simp_all
-
+import Logic.MultiSuccCorsiTassi.Result
 
 namespace multiSucc
 open multiSucc
@@ -34,94 +23,6 @@ open multiSucc
 open Proof
 open Refutation
 
---give sequent, hist, blocked
-inductive Result (s : Sequent) (h : List Imp) where
-| proof (ps : List (Proof s)) : ps ≠ [] → Result s h
-| refutation (rf : List (Refutation s h)) : rf ≠ []  → Result s h
-
-def Result.proofs : Result s h → List (Proof s )
-| .proof pf _ => pf
-| _ => []
-
-def Result.refutations : Result s h → List (Refutation s h)
-| .refutation rs _ => rs
-| _ => []
-
-/- def Result.refutationss : List (Result s) → List (Refutation s b h)
-| r :: rs =>
-  match r with
-  | .refutation rfs => rfs ++ Result.refutationss rs
-  | _ =>  Result.refutationss rs
-| [] => []
-
-def Result.proofss : List (Result s) → List (Proof ⟨s.Γ ∪ ↑(b.map Imp.toForm) , s.Δ⟩)
-| r :: rs =>
-  match r with
-  | .proof pf => pf ++ Result.proofss rs
-  | _ => Result.proofss rs
-| [] => [] -/
-
-def Proof.castSeq (x : Proof ⟨a₁, b₁, c₁⟩)
-    (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hc : c₁ = c₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
-    Proof ⟨a₂, b₂, c₂⟩ := by subst_eqs; assumption
-
-def Proof.castSeqList (x : List (Proof ⟨a₁, b₁, c₁⟩))
-    (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hc : c₁ = c₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
-    List (Proof ⟨a₂, b₂, c₂⟩) := by subst_eqs; assumption
-
-@[simp, grind =]
-theorem Proof.castSeqList_eq_nil : Proof.castSeqList x ha hb = [] ↔ x = [] := by subst_eqs; simp [castSeqList]
-
-def Refutation.castSeq (x :  Refutation ⟨a₁, b₁, c₁⟩ h)
-    (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hc : c₁ = c₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hh : h = h' := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
-    Refutation ⟨a₂, b₂, c₂⟩ h' := by subst_eqs; exact x
-
-def Refutation.castSeqList (x : List (Refutation ⟨a₁, b₁, c₁⟩ h))
-    (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hc : c₁ = c₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-    (hh : h = h' := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
-    List (Refutation ⟨a₂, b₂, c₂⟩ h') := by subst_eqs; exact x
-
-@[simp, grind =]
-theorem Refutation.castSeqList_eq_nil : Refutation.castSeqList x ha hb bb hh = [] ↔ x = [] := by subst_eqs; simp [castSeqList]
-
-def Result.castSeq (x : Result ⟨a₁, b₁, c₁⟩ h)
-  (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-  (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-  (hc : c₁ = c₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
-  (hh : h = h' := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
-  Result ⟨a₂, b₂, c₂⟩ h' := by subst_eqs; exact x
-
-
-def Result.map
-  (r : Result s h)
-  (h' : List Imp)
-  (f₁ : Proof s → Proof s')
-  (f₂ :  Refutation s h → Refutation s' h') :
-  Result s' h' :=
-  match r with
-  | .proof ps _ => .proof (ps.map f₁) (by simpa)
-  | .refutation rs _ => .refutation (rs.map f₂) (by simpa)
-
-def Result.map2proof (r₁ : Result s1 h1) (r₂ : Result s2 h2)
-  (fproof : (Proof s1) →
-           (Proof s2) →
-           (Proof s'))
-  (ref₁ : (Refutation s1 h1) → (Refutation s' h'))
-  (ref₂ : (Refutation s2 h2) → (Refutation s' h')): Result s' h':=
-  match r₁, r₂ with
-  | .proof pf₁ _, .proof pf₂ _ => .proof ((List.product (Proof.castSeqList pf₁) (Proof.castSeqList pf₂ )).map (fproof).uncurry) (by simp; grind)
-  | .refutation rs₁ _, .refutation rs₂ _ => .refutation ( rs₁.map ref₁ ++ rs₂.map ref₂) (by simp; grind only)
-  | .refutation  rs _, _ => .refutation (rs.map ref₁) (by simpa)
-  | _, .refutation rs _ => .refutation (rs.map ref₂) (by simpa)
 
 
 -- [[1,2] [3] [4,5]] = [[1,3,4] [1,3,5] [2,3,4] [2,3,5]]
@@ -256,92 +157,20 @@ sorry
 theorem impR_cap
 (block : List Imp)
 (hist : List Imp)
-(impRH : Imp)
-(impRT : List Imp)
-(ha : { f := f, g := g } ∈ (impRH :: impRT))
+(impR : List Imp)
+(ha : { f := f, g := g } ∈ impR)
 : insert { f := f, g := g }
     (collectImpsForm f ∪
       ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪ (collectImpsForm g ∪ hist.toFinset))) ⊆
-  insert impRH
-    (block.toFinset.biUnion collectImpsImp  ∪
-      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ∪ hist.toFinset)))) := by
-  have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆
-                   insert impRH (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ))) := by
-                  intro x hx
-                  simp at hx
-                  rcases hx with head | tail₁ | tail₂
-                  . simp_all; grind
-                  . simp_all; grind
-                  . simp_all; grind
-  have eq : (block).toFinset.biUnion collectImpsImp = (block.map Imp.toForm).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
-  intro x hx
-  simp only [Finset.mem_insert, Finset.mem_union] at hx ⊢
-  rcases hx with hhead | hcf | hblock | hcg | hhist
-  · have hinc : x ∈ insert impRH
-      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp))) := by
-      exact inclusion (by simp [hhead])
-    simp only [Finset.mem_insert, Finset.mem_union] at hinc
-    grind
-  · have hinc : x ∈ insert impRH
-      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp))) := by
-      exact inclusion (by simp [hcf])
-    simp only [Finset.mem_insert, Finset.mem_union] at hinc
-    grind
-  · grind
-  · have hinc : x ∈ insert impRH
-      (collectImpsForm impRH.f ∪ (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp))) := by
-      exact inclusion (by simp [hcg])
-    simp only [Finset.mem_insert, Finset.mem_union] at hinc
-    grind
-  · grind
+  block.toFinset.biUnion collectImpsImp ∪ (impR.toFinset.biUnion collectImpsImp ∪ hist.toFinset) := by
+  have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆ impR.toFinset.biUnion collectImpsImp := by
+    intro x hx
+    simp at hx
+    rcases hx with head | tail₁ | tail₂
+    all_goals simp_all; grind
+  have eq : block.toFinset.biUnion collectImpsImp = (block.map Imp.toForm).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
+  grind
 
-theorem hist_card_drop_of_impR_step
-  (block hist : List Imp)
-  (impRH : Imp)
-  (impRT : List Imp)
-  (cap : ℕ)
-  {f g : Form}
-  (ha : { f := f, g := g } ∈ (impRH :: impRT))
-  (hcap :
-    (insert impRH
-      (block.toFinset.biUnion collectImpsImp ∪
-        (collectImpsForm impRH.f ∪
-          (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ∪ hist.toFinset))))).card ≤ cap)
-  (metaR1 : (impRH :: impRT) ∩ hist = [])
-  : cap - (insert { f := f, g := g } hist.toFinset).card < cap - hist.toFinset.card := by
-  have hx : { f, g } ∉ hist := by
-    intro hmem
-    have : { f, g } ∈ (impRH :: impRT) ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
-    simpa [metaR1] using this
-  have hxFin : { f, g } ∉ hist.toFinset := by simpa using hx
-  have hsubset :
-      insert { f := f, g := g }
-          (collectImpsForm f ∪
-            ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪
-              (collectImpsForm g ∪ hist.toFinset))) ⊆
-        insert impRH
-          (block.toFinset.biUnion collectImpsImp ∪
-            (collectImpsForm impRH.f ∪
-              (collectImpsForm impRH.g ∪ (impRT.toFinset.biUnion collectImpsImp ∪ hist.toFinset)))) :=
-    impR_cap block hist impRH impRT ha
-  have hle : (insert { f := f, g := g } hist.toFinset).card ≤ cap := by
-    have hmem :
-        insert { f := f, g := g } hist.toFinset ⊆
-          insert { f := f, g := g }
-            (collectImpsForm f ∪
-              ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪
-                (collectImpsForm g ∪ hist.toFinset))) := by
-      intro x hx
-      simp only [Finset.mem_insert, Finset.mem_union] at hx ⊢
-      rcases hx with rfl | hx
-      · simp
-      · simp [hx]
-    exact le_trans (Finset.card_le_card (hmem.trans hsubset)) hcap
-  have hsucc : (insert { f, g } hist.toFinset).card = hist.toFinset.card + 1 := by
-    exact Finset.card_insert_of_notMem hxFin
-  have hlt : hist.toFinset.card < cap := lt_of_lt_of_le (by simpa [hsucc]) hle
-  rw [hsucc, Nat.sub_add_eq]
-  simpa using Nat.sub_lt (Nat.sub_pos_of_lt hlt) (by decide : 0 < 1)
 
 
 /- METARULES
@@ -372,16 +201,15 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
         match common : as ∩ bs with --CHANGED
         -- no common atoms
         | [] =>
-          match impR with
-          | [] =>  by
+          if h : impR = [] then by
+            subst_eqs
             simp [Seq4Proof.toSeq, List.append_nil]
             let rule := [ax hist as bs block (by grind)]
             exact Result.refutation rule (by grind)
           --METARULE 1 NONINVERTABLE REEGEL
-          | impRH :: impRT => by
-            let impR := impRH :: impRT
+          else by
             simp only [Seq4Proof.toSeq, List.append_nil]
-            let impRApplications :
+            have impRApplications :
             -- find either a list of proofs for any of the imps, if none found, get the function required to get ALL refutations
                 List (
                   {pf : List (Proof ⟨↑(as.map Form.atoms), ↑block, ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
@@ -396,9 +224,10 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                 | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
                 | .refutation rf neqE => .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩), by simpa using neqE⟩
               )
-            have neq_empt : impRApplications ≠ [] := by
+            /- have neq_empt : impRApplications ≠ [] := by
+              subst_eqs
               simp [impRApplications]
-            let res := pickProof impRApplications
+              exact h -/
 
             --let neqE : impRApplications.filterMap Sum.getLeft? = some ys
             match hpick : pickProof impRApplications with
@@ -495,35 +324,37 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
 termination_by s.weight cap
 decreasing_by
   all_goals
-    simp_all only [Seq4Proof.weight, Seq4Proof.cap, Seq4Proof.r, Weight.lt_iff, Weight.lt]
-    simp_all only [Finset.union_assoc, List.empty_eq, List.toFinset_nil, Finset.biUnion_empty, Finset.empty_union,
-      Finset.union_empty, List.toFinset_cons, Finset.biUnion_insert, collectImpsImp, Finset.singleton_union,
-      Finset.insert_union, Finset.union_insert, size_sum, size_sum_increased, add_zero, List.map_nil, size_sum.eq_1,
-      List.map_cons, Imp.toForm, size_sum.eq_2, sizeOf_Form, zero_add]
+    simp_all [Seq4Proof.weight, Weight.lt_iff, Seq4Proof.r]
     try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT]
-    try linarith
   · left
-    simpa [impR] using hist_card_drop_of_impR_step block hist impRH impRT cap ha hcap metaR1
-  · left
-    /- have hle : (insert { f := f, g := g } hist.toFinset).card ≤ cap := by
-      have hmem :
-          insert { f := f, g := g } hist.toFinset ⊆
-            insert { f := f, g := g }
+    have hx : { f, g} ∉ hist := by
+      intro hmem
+      have : { f, g} ∈ impR ∩ hist := List.mem_inter_of_mem_of_mem ha hmem
+      simp_all
+    have : hist.toFinset.card + 1 ≤ cap := by
+      have hxFin : {f, g} ∉ hist.toFinset := by simpa using hx
+      have hsubset₁ :
+          insert {f, g} hist.toFinset ⊆
+            insert {f, g}
               (collectImpsForm f ∪
                 ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪
                   (collectImpsForm g ∪ hist.toFinset))) := by
-        intro x hx
-        simp only [Finset.mem_insert, Finset.mem_union] at hx ⊢
-        rcases hx with rfl | hx
+        intro x hx'
+        simp only [Finset.mem_insert, Finset.mem_union] at hx' ⊢
+        rcases hx' with rfl | hxh
         · simp
-        · simp [hx]
-      exact le_trans (Finset.card_le_card (hmem.trans hsubset)) hcap -/
-    have : hist.toFinset.card ≤ cap := by simp_all; sorry
-    sorry
-    --exact hist_card_drop_of_impR_step block hist impRH impRT cap (by grind) hcap metaR1
-  · left
-    sorry
-    --exact hist_card_drop_of_impR_step block hist impRH impRT cap (by grind) hcap metaR1
+        · grind
+      have hsubset₂ :
+          insert {f, g} hist.toFinset ⊆
+            (block.toFinset.biUnion collectImpsImp ∪ (impR.toFinset.biUnion collectImpsImp ∪ hist.toFinset)) :=
+        Finset.Subset.trans hsubset₁ (impR_cap block hist impR (f := f) (g := g) ha)
+      have hcard :
+          (insert {f, g} hist.toFinset).card ≤ cap := by
+        exact le_trans (Finset.card_le_card hsubset₂) hcap
+      grind
+    simp_all
+    grind
+
 
 
 def automatedProofHelper (s : Sequent) : Std.Format :=
@@ -556,3 +387,5 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 --#eval! evaluate (form {((¬ p → ¬ q) → (q → p))})
 #print axioms automatedProofHelper
 end multiSucc
+
+#min_imports

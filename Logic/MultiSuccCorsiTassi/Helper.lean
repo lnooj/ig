@@ -41,51 +41,54 @@ def size_sum_increased : List Form → Nat
 
 
 /-- weight function based on paper to prove termination :
-- (r,n) where r is nr of R→ occurences there has been in this branch and
+- (r,n) where r is nr of R→ occurences there has been in this branch
+- cap_r is the difference of the max r value and current and
 - n is the complexity of the set of forms that can be used as principle to any rule
 -/
 @[grind]
 structure Weight where
-  cap_r : ℕ
+  cap_r : ℕ -- cap - r
   n : ℕ
   --hr : r ≤ cap
 
 namespace Weight
+-- now it is a Lex order
+@[simp, grind]
+def toPair (w : Weight) : ℕ × ℕ := (w.cap_r, w.n)
 
-@[grind]
+@[simp, grind]
+instance : LT Weight :=
+  ⟨fun a b => (toLex (toPair a) : ℕ ×ₗ ℕ) < toLex (toPair b)⟩
+
+/-  @[grind]
 def lt (a b : Weight ) := a.cap_r < b.cap_r ∨ a.cap_r = b.cap_r ∧ a.n < b.n
+ -/
 
-@[simp]
-instance instLT : LT (Weight ) where lt := lt
-
-@[grind =]
-theorem lt_iff {a b : Weight } : a < b ↔ a.lt b := by rfl
-
+ @[simp, grind =]
+theorem lt_iff {a b : Weight } : a < b ↔ a.cap_r < b.cap_r ∨ a.cap_r = b.cap_r ∧ a.n < b.n := by
+  simpa [Weight.toPair] using
+    (Prod.Lex.toLex_lt_toLex (x := toPair a) (y := toPair b))
+/-
 @[simp, grind]
 theorem mk_lt_mk {a₁ a₂ b₁ b₂ : ℕ} :
     ({ cap_r := a₁, n := a₂ } : Weight) < { cap_r := b₁, n := b₂ }
       ↔ a₁ < b₁ ∨ a₁ = b₁ ∧ a₂ < b₂ := by
-  rfl
+  rfl -/
 
-@[simp]
+/- @[simp]
 theorem lt_toLex_iff (a b : Weight) :
   ((toLex (a.cap_r, a.n) : ℕ ×ₗ ℕ) < (toLex (b.cap_r, b.n) : ℕ ×ₗ ℕ)) ↔ a < b := by
   simpa [Weight.lt] using
     (Prod.Lex.toLex_lt_toLex
       (x := (a.cap_r, a.n)) (y := (b.cap_r, b.n)))
-
+ -/
 @[simp, grind]
 instance instWellFoundedRelation : WellFoundedRelation (Weight ) where
   rel a b := a < b
   wf := by
-    let r : Weight → Weight → Prop :=
-      InvImage (fun x y : ℕ ×ₗ ℕ => x < y) (fun x : Weight ↦ (toLex (x.cap_r, x.n) : ℕ ×ₗ ℕ))
-    have hrel : r = fun a b => a < b := by
-      funext a b
-      simp [r, lt_toLex_iff]; sorry
-    have wf' : WellFounded r := InvImage.wf _ wellFounded_lt
-    simpa [hrel] using wf'
-
+    let rel' : WellFoundedRelation Weight :=
+      invImage (fun x ↦ (toLex x.toPair : ℕ ×ₗ ℕ)) Prod.Lex.instWellFoundedRelationLexOfWellFoundedLT
+    convert rel'.wf with a b
 
 end Weight
 
