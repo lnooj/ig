@@ -13,7 +13,7 @@ import Mathlib.Data.Finset.Union
 import Mathlib.Data.Finset.Card
 
 import Logic.MultiSuccCorsiTassi.Display
-import Logic.MultiSuccCorsiTassi.Completeness
+--import Logic.MultiSuccCorsiTassi.Completeness --needed to display CMs
 import Logic.MultiSuccCorsiTassi.Result
 
 namespace multiSucc
@@ -71,7 +71,7 @@ theorem mem_of_mem_choices {xss : List (List α)} {xs : List α} {c : List α}
 /-- Picks only proofs (α) if any, else returns all the refutations (β)
 if .inl (proof) is returned, it is never empty, if .inr is returned, it is the length of the original input list -/
 def pickProof : List (α ⊕ β) → List (α) ⊕ List (β)
-| [] => .inr [] --empty refutation
+  | [] => .inr [] --empty refutation
   | x::xs =>
     match x, pickProof xs with
     | .inl a, .inl as => .inl (a::as)
@@ -121,37 +121,6 @@ theorem Subtype.prop_map
               ({ f := a, g := b } :: hist)) // rf ≠ [] }) : [] ∉ rfs.unattach := by
   simp_all only [ne_eq, List.mem_unattach, not_true_eq_false, IsEmpty.exists_iff, not_false_eq_true]
 
-theorem stupid
-(rfs : List { rf // rf ≠ [] })
-(rfs_ne_empt : rfs ≠ []) -- how to get this
-(choices : List
-  (List
-    ((a : Form) ×
-      (b : Form) ×
-        Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
-          ({ f := a, g := b } :: hist))) := multiSucc.choices (List.map Subtype.val rfs))
-(ruleR : ((a b : Form) →
-    { f := a, g := b } ∈ impR →
-      Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
-        ({ f := a, g := b } :: hist)) →
-  Refutation
-    { Γa := ↑(List.map Form.atoms as), Γb := ↑block, Δ := ↑(List.map Form.atoms bs ++ List.map Imp.toForm impR) } hist)
-(metaR1 : impR ∩ hist = [])
-
-(impRApplications : List ({pf : List (Proof ⟨↑(as.map Form.atoms), ↑block, ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
-                  {rf : List ((a b : Form) × Refutation ⟨↑(a :: as.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
-                ))
-(hpick_inr : impRApplications = List.map Sum.inr rfs)
-: (multiSucc.choices (List.map Subtype.val rfs)).attach ≠ [] := by
---intro a
-rw [List.attach_ne_nil_iff]
-have : choices =  multiSucc.choices (List.map Subtype.val rfs) := by sorry
-have : multiSucc.choices (List.map Subtype.val rfs) = [] ↔ (List.map Subtype.val rfs) = [] ∨ [] ∈ (List.map Subtype.val rfs) :=
-      choices_eq_nil
-simp_all; clear this
-have :  [] ∉ rfs.unattach := Subtype.prop_map rfs
-intro b -- need to show that impRapplication it has to return a list that is not empty itself (we know that elements are not empty lists)
-sorry
 
 @[grind .]
 theorem impR_cap
@@ -188,6 +157,15 @@ theorem impR_cap
    või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
  -/
 
+def _root_.List.mapNonempty {α β : Type*} (f : α → β) (xs : List α) (h : xs ≠ []) : {ys : List β // ys ≠ []} :=
+  ⟨xs.map f, by simp [h]⟩
+
+def _root_.List.unattach_ne (hnotempty : ¬rfs = []) : ¬rfs.unattach = [] := by
+  intro h
+  have : rfs.unattach = [] → rfs = [] := by apply List.map_eq_nil_iff.mp
+  grind
+
+
 def automatedProof (s : Seq4Proof) (cap : ℕ )
                   (hcap : s.cap.card ≤ cap := by simp at *; grind )
                   (metaR1 : s.impR ∩ s.hist = ∅ := by grw [metaR1]) :
@@ -209,25 +187,21 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
           --METARULE 1 NONINVERTABLE REEGEL
           else by
             simp only [Seq4Proof.toSeq, List.append_nil]
-            have impRApplications :
+            have ⟨impRApplications, hnotempty⟩ :
             -- find either a list of proofs for any of the imps, if none found, get the function required to get ALL refutations
-                List (
+                {l : List (
                   {pf : List (Proof ⟨↑(as.map Form.atoms), ↑block, ↑(bs.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
                   {rf : List ((a b : Form) × Refutation ⟨↑(a :: as.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
-                ) :=
-              impR.attach.map (λ (⟨⟨f, g⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦
-                have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
-                                                (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
-                let xs := as.map Form.atoms; let ys := bs.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
-                have ruleP := impr f g xs ys block
-                match premise with
-                | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
-                | .refutation rf neqE => .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩), by simpa using neqE⟩
-              )
-            /- have neq_empt : impRApplications ≠ [] := by
-              subst_eqs
-              simp [impRApplications]
-              exact h -/
+                ) // l ≠ []} :=
+                impR.attach.mapNonempty (λ (⟨⟨f, g⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦
+                  have premise := automatedProof ⟨as, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
+                                                  (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
+                  let xs := as.map Form.atoms; let ys := bs.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
+                  have ruleP := impr f g xs ys block
+                  match premise with
+                  | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
+                  | .refutation rf neqE => .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩), by simpa using neqE⟩
+                ) (List.attach_ne_nil_iff.mpr h)
 
             --let neqE : impRApplications.filterMap Sum.getLeft? = some ys
             match hpick : pickProof impRApplications with
@@ -235,16 +209,14 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
             | .inr rfs =>
               let choices := choices (rfs.map Subtype.val) --all dif ways to construct refutation
               have ruleR := (Refutation.impr hist as bs impR block (by grind)) --new parent to choices
-              have hpick_inr : impRApplications = rfs.map Sum.inr := by
-                simpa using (pickProof_eq_inr.mp hpick)
               exact .refutation (choices.attach.map (λ ⟨c, h⟩ ↦
                                                 ruleR (λ a b hab ↦
                                                       (c.findSome? (λ ⟨a', b', r'⟩ ↦ -- find the same imp in child as in parent
                                                         if _ : a = a' ∧ b = b'
                                                           then some (r'.castSeq (hb := by grind) (hh := by grind) (hc := by grind))
-                                                        else none)).get sorry)--prove that same imps can be found in choices as in parent
+                                                        else none)).get (by simp; sorry))--prove that same imps can be found in choices as in parent
                                                     )
-                                ) (by sorry)--(by simp; intro a; rw [List.attach_eq_nil_iff, choices_eq_nil] at a; simp_all;  sorry)
+                                ) (by simp [choices]; apply List.attach_eq_nil_iff.not.mpr; simp; apply List.unattach_ne (by simp_all))
         | xs@(_::_) => by
           --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
           --have corr := findIntersCorr as bs
@@ -356,13 +328,12 @@ decreasing_by
     grind
 
 
-
 def automatedProofHelper (s : Sequent) : Std.Format :=
   have res := automatedProof s.toSeq4 s.toSeq4.cap.card (by simp) (by simp [Sequent.toSeq4])
 
   match res with
   | .proof ps _ =>  dbg_trace s!"have proof {ps.length}"; String.toFormat (listProofToString ps)
-  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf ++ listModelToString (rf.map (λ r ↦ r.getCM)))
+  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf /- ++ listModelToString (rf.map (λ r ↦ r.getCM)) -/)
 
 --modusponens "a → b, a ⊢ β"
 #eval! automatedProofHelper (seq {(p → q), p ⊢ q})
