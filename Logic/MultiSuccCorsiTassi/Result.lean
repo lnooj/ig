@@ -1,7 +1,6 @@
 import Logic.MultiSuccCorsiTassi.Proof
 import Logic.MultiSuccCorsiTassi.Refutation
 
-
 @[grind =]
 theorem List.prodcut_eq_nil {α β : Type u} {xs : List α} {ys : List β} :
     xs.product ys = [] ↔ xs = [] ∨ ys = [] := by

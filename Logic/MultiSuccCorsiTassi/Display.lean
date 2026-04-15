@@ -2,7 +2,7 @@ import Mathlib.Data.Multiset.Sort
 import Mathlib.Data.List.Lex
 import Mathlib.Data.Finset.Sort
 
-import Logic.MultiSuccCorsiTassi.Core
+import Logic.MultiSuccCorsiTassi.Syntax
 import Logic.MultiSuccCorsiTassi.Kripke
 import Logic.MultiSuccCorsiTassi.Proof
 import Logic.MultiSuccCorsiTassi.Refutation
@@ -28,14 +28,6 @@ def Imp.toString (x : Imp) : String := x.toForm.toString
 def Imp.toStringBlocked (x : Imp) : String := x.toString ++ "*"
 
 instance : ToString Form := ⟨Form.toString⟩
-
-/- instance : ToString Sequent where
-  toString seq :=
-  (String.intercalate ", " ((seq.Γa_getList).map Form.toString ++
-                            (seq.Γb_getList).map Imp.toStringBlocked)) ++
-    " ⊢ " ++
-    String.intercalate ", " ((seq.Δ_getList).map Form.toString)
- -/
 
 instance : ToString World where
   toString world :=

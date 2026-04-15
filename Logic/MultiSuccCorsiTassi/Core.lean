@@ -57,18 +57,11 @@ def SequentElem.toForm : SequentElem → Form
 @[grind]
 structure Sequent where
   Γa : Multiset Form
-  Γb : Multiset Imp
+  Γb : Multiset Imp -- blocked implication seperate, seperate semantics
   Δ : Multiset Form
 
 def Sequent.Γ (s : Sequent) := s.Γa ∪ s.Γb.map Imp.toForm
 
---TODO Sequent.normalize
-
-/- theorem Sequent.ext {s s' : Sequent} (hΓ : s.Γ = s'.Γ) (hΔ : s.Δ = s'.Δ) : s = s' := by
-  cases s; cases s'; simp_all [Γ];
-  constructor
-  . sorry
-  . sorry -/
 
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
@@ -87,7 +80,7 @@ structure Seq4Proof where
 
 /-
   Ordering formulas is more tricky since we are dealing with tree-like structures
-  We encode them into lists of nats (question: can we use `Nat` as encoding? Why or why not?)
+  We encode them into lists of nats
 -/
 @[simp]
 def Form.encode : Form → List Nat
@@ -144,10 +137,8 @@ lemma Imp.ext {a b : Imp} (h : a.encode = b.encode) : a = b := by
 
 /-
   We can give a canonical ordering to `Form`s using our encodings
-  Note that there is already an instance of `LinearOrder (List α)` in the library
   Our definition of ordering is this: `f ≤ g ↔ Form.encode f ≤ Form.encode g`
 -/
-
 instance : LinearOrder Form :=
   LinearOrder.lift' Form.encode (fun _ _ h => form_inj h)
 
@@ -157,21 +148,12 @@ instance : LinearOrder Atom :=
 instance : LinearOrder Imp :=
   LinearOrder.lift' Imp.encode (fun _ _ h => Imp.ext h)
 
---instance : LE (ImpB) where le f g := sorry
-/- `LinearOrder Nat` is already defined in the library
-   But `Form` is our own type, so we need to give it one
-   Since `Form` is made up of `Atom` and `Form`, we need to take into account both
--/
 def example1 : Multiset Nat := {3, 1, 2, 2}
 def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 
 /-
    We can turn multisets into (computable) sorted lists with `sort`
    But `sort` needs a relation with respect to which it will sort the elements on the multiset
-
-   Why?
-   For example, given `{0, 1, 0}`, should we print it as `[0, 0, 1]` or `[0, 1, 0]`?
-   We need some canonical order to decide this so in our case, we can use `≤` for sorting
 -/
 
 #eval Multiset.sort example1 LE.le
@@ -184,8 +166,6 @@ def Sequent.Δ_getList { s : Sequent} : List Form := Multiset.sort s.Δ LE.le
 
 @[simp]
 def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
-  --have ant := Multiset.ofList ((p.as.map .atoms) ++ p.fL ++ (p.block.map ImpB.toForm) )
-  --have succ := Multiset.ofList ((p.bs.map .atoms) ++ p.fR ++ p.impR.map Imp.toForm)  -- hist is to monitor R→ usage, not to display
   have antPure := Multiset.ofList ((p.as.map Form.atoms) ++ p.fL)
   have antBlocked := Multiset.ofList p.block
   have succ := Multiset.ofList ((p.bs.map Form.atoms) ++ p.fR ++ (p.impR.map Imp.toForm))

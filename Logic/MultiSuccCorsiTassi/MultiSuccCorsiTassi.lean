@@ -1,20 +1,16 @@
-import Mathlib.Tactic.Linarith.Frontend
-import Mathlib.Tactic.SimpRw
-import Mathlib.Data.Prod.Lex
-import Mathlib.Data.Multiset.Basic
-import Mathlib.Data.Multiset.UnionInter
-import Mathlib.Logic.Equiv.Defs
-import Mathlib.Data.List.Lemmas
-import Mathlib.Data.List.Dedup
-import Mathlib.Data.List.Lex
-import Mathlib.Data.Multiset.Sort
-import Mathlib.Data.Finset.Basic
-import Mathlib.Data.Finset.Union
-import Mathlib.Data.Finset.Card
+import Mathlib.Data.Nat.Cast.Order.Ring
 
 import Logic.MultiSuccCorsiTassi.Display
---import Logic.MultiSuccCorsiTassi.Completeness --needed to display CMs
 import Logic.MultiSuccCorsiTassi.Result
+
+
+def List.mapNonempty {α β : Type*} (f : α → β) (xs : List α) (h : xs ≠ []) : {ys : List β // ys ≠ []} :=
+  ⟨xs.map f, by simp [h]⟩
+
+def List.unattach_ne (hnotempty : ¬rfs = []) : ¬rfs.unattach = [] := by
+  intro h
+  have : rfs.unattach = [] → rfs = [] := by apply List.map_eq_nil_iff.mp
+  grind
 
 namespace multiSucc
 open multiSucc
@@ -23,32 +19,19 @@ open multiSucc
 open Proof
 open Refutation
 
-
-
+/-! # choices -/
 -- [[1,2] [3] [4,5]] = [[1,3,4] [1,3,5] [2,3,4] [2,3,5]]
 def choices : List (List CM) → List (List CM)
 | [] => []
 | [x] => x.map ([·])
 | x::y::xs => x.product (choices (y::xs)) |>.map (fun ⟨a, as⟩ ↦ a :: as)
 
-/- @[simp, grind =]
-theorem product_length {as : List α} {bs : List β} :
-    (as.product bs).length = as.length * bs.length := by
-  simp [List.product, List.map_const']
-
-attribute [grind =] List.pair_mem_product -/
-
-/- @[simp, grind =]
-theorem choices_length {xs : List (List α)} :
-    (choices xs).length = if xs = [] then 0 else (xs.map (·.length)).prod := by
-  fun_induction choices with grind -/
-
 @[grind =, simp]
 theorem choices_eq_nil {xs : List (List α)} : choices xs = [] ↔ xs = [] ∨ [] ∈ xs := by
   fun_induction choices with
   | case1 => simp
   | case2 => simp
-  | case3 => simp_all; grind
+  | case3 => simp_all; grind only [= List.prodcut_eq_nil]
 
 @[grind ., simp]
 theorem mem_of_mem_choices {xss : List (List α)} {xs : List α} {c : List α}
@@ -68,6 +51,7 @@ theorem mem_of_mem_choices {xss : List (List α)} {xs : List α} {c : List α}
           simp_all
           grind
 
+/-! # pickproof -/
 /-- Picks only proofs (α) if any, else returns all the refutations (β)
 if .inl (proof) is returned, it is never empty, if .inr is returned, it is the length of the original input list -/
 def pickProof : List (α ⊕ β) → List (α) ⊕ List (β)
@@ -96,7 +80,7 @@ theorem pickProof_eq_inr {xs : List (α ⊕ β)} {ys : List β} :
     pickProof xs = .inr ys ↔ xs = ys.map .inr := by simp [pickProof_eq]
 
 
-
+/-! # other -/
 theorem subtype_val_flatten_notEmpty
 (pf : List { pfs // pfs ≠ [] })
 (h : pickProof impRApplications = Sum.inl pf)
@@ -156,14 +140,6 @@ theorem impR_cap
 4. -our own- kõik mittepööratavad reeglid tuleb panna kõrvale ja jõuda pööratavate reeglite kasutusel kas aksioomini
    või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
  -/
-
-def _root_.List.mapNonempty {α β : Type*} (f : α → β) (xs : List α) (h : xs ≠ []) : {ys : List β // ys ≠ []} :=
-  ⟨xs.map f, by simp [h]⟩
-
-def _root_.List.unattach_ne (hnotempty : ¬rfs = []) : ¬rfs.unattach = [] := by
-  intro h
-  have : rfs.unattach = [] → rfs = [] := by apply List.map_eq_nil_iff.mp
-  grind
 
 
 def automatedProof (s : Seq4Proof) (cap : ℕ )
@@ -354,7 +330,6 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 -- Pierce ((p → q )→ p) → p
 #eval! automatedProofHelper (seq {⊢ (((p → q )→ p) → p)})
 #eval! automatedProofHelper (seq {⊢ (p ∨ ¬p )})
-#eval! automatedProofHelper (seq {⊢ ¬¬(p ∨ ¬p )})
 --#eval! evaluate (form {((¬ p → ¬ q) → (q → p))})
 #print axioms automatedProofHelper
 end multiSucc

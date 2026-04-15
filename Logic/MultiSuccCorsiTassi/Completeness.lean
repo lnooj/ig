@@ -1,8 +1,5 @@
-import Logic.MultiSuccCorsiTassi.Core
-import Logic.MultiSuccCorsiTassi.Helper
-import Logic.MultiSuccCorsiTassi.Kripke
 import Logic.MultiSuccCorsiTassi.Refutation
---import Logic.MultiSuccCorsiTassi.MultiSuccCorsiTassi
+
 
 namespace multiSucc
 open multiSucc
@@ -38,6 +35,7 @@ theorem Refutation.ant_atom_forced (r : Refutation s h)
 theorem Refutation.ant_atom_unforced (r : Refutation s h)
   (ha : Form.atoms a ∈ s.Δ) : a ∈ r.getCM.world.unforced := by
   induction r generalizing a <;> simp_all
+
 /- def Result.getCMs (r : Result s b h) : List Model :=
 match r with
 | refutation rfs _ => rfs.map (λ rf ↦ Refutation.getCM rf )
@@ -62,37 +60,7 @@ theorem Refutation.cm_wf (r : Refutation s h) : r.getCM.wf := by
       apply Models.getUnforced_elem (by grind) b hmem
 
 
-
-/- theorem Refutation.hist_corr {hs : List Imp} {a b : Form}
-  (pf : { f := a, g := b } ∈ hs)
-  (r : Refutation s hs )
-  (wf : r.getCM.wf)
-  --(hΔ : s.Δ = ↑((a ⊃ b) :: ys))
-  : a.eval r.getCM = .t := by
-  induction r  with
-  | ax =>
-    simp_all
-    sorry
-
-  | botr => simp_all
-  | andl => simp_all
-  | andr₁ => simp_all
-  | andr₂ => simp_all
-  | orl₁ => simp_all
-  | orl₂ => simp_all
-  | orr => simp_all
-  | impr bl hs' as bs ys i prem ih =>
-    simp_all; --rw [Model.wf] at wf; simp_all
-    have : { f := a, g := b } ∈ ys := sorry
-    have swf := wf; rw [Model.wf] at swf
-    simp_all
-    specialize ih a b this (by grind); specialize prem a b
-    sorry--let := Model.momo_branch_true wf (by sorry) (by sorry)
-  | impl₁ => simp_all
-  | impl₂ => simp_all
-  | afort =>  simp_all -/
-
-
+/- TODO: problem with proving that all left imp sides in hist list evaluate to true -/
 theorem Refutation.correctness :
   ∀ (s : Sequent) ( r : Refutation s h) (_ : r.getCM.wf ),
       s.eval r.getCM = TV.f := by
@@ -143,3 +111,4 @@ theorem Refutation.correctness :
     --grind
 
 end multiSucc
+#min_imports

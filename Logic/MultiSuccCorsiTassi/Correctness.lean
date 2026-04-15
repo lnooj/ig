@@ -9,32 +9,10 @@ import Logic.MultiSuccCorsiTassi.Proof
 namespace multiSucc
 open multiSucc
 
-theorem Model_ertyu : ∀ m : Model, m.world.forced ∩ m.world.unforced = ∅ := by sorry
-
-/-- If a sequent gets  countermodels as results, each of those models must refute the sequent  -/
-/- theorem Model_correctness :
-  ∀ (s : Sequent) {capProof} {metaR1} (ms : List Model),
-    automatedProof s.toSeq4 s.toSeq4.cap.card capProof metaR1 = Result.m ms →
-    ∀ m ∈ ms, evalSeq s m = TV.f := by
-    intro s proof r1 ms res c h
-    simp [evalSeq, conjTV, disjTV, Form.eval]; sorry -/
 
 
-@[simp]
-theorem evalBlocked_true_in_branch {i : Imp} {m m' : Model}
-  (wf : m.wf )
-  (hm_mem : m' ∈ m.all)
-  (this : evalBlocked i m = TV.t) : (i.f ⊃ i.g).eval m' = TV.t := by
-  rw [evalBlocked_true_iff] at this
-  rw [eval_imp_true_iff]
-  simp_all
-  constructor
-  . sorry
-  . sorry
 
---TODO if all atoms in stuctures every world, then eval = .t
--- if eval u, then some atom ....
--- sequent holds if for all structures
+/- TODO: problem with showing impr correctness, because of blocked implication semantics -/
 theorem proof_correctness :
   ∀ (s : Sequent) (_ : Proof s) (m : Model) (_ : m.wf), s.eval m ≠ TV.f := by
   intro s pf m wf
@@ -99,7 +77,7 @@ theorem proof_correctness :
 
 #print axioms proof_correctness
 
-
+/- test proof for only the truth value. Here ax case can currently not be proved -/
 theorem proof_correctness' :
   ∀ (s : Sequent) (_ : Proof s) (m : Model) (_ : m.wf), s.eval m = TV.t := by
   intro s pf m wf

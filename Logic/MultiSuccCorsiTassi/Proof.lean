@@ -1,13 +1,8 @@
-
-import Logic.MultiSuccCorsiTassi.Core
 import Logic.MultiSuccCorsiTassi.Helper
 
 namespace multiSucc
 open multiSucc
-/-
-Multi-succedent formulas.
-Added a fortiori
- -/
+
 inductive Proof : Sequent → Type
   -- ∀ x Γ, x ++ Γ ⊢ x ++ Δ
   | ax :
@@ -61,3 +56,6 @@ inductive Proof : Sequent → Type
     ∀ (a b : Form) (xs ys : List Form) (bl : List Imp),
       Proof ⟨↑xs, ↑bl, ↑(b :: ys)⟩ →
       Proof ⟨↑xs, ↑bl, ↑((a ⊃ b) :: ys)⟩
+
+end multiSucc
+#min_imports

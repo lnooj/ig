@@ -1,7 +1,4 @@
 import Logic.MultiSuccCorsiTassi.Core
-import Logic.MultiSuccCorsiTassi.Syntax
-import Logic.MultiSuccCorsiTassi.Helper
-import Logic.MultiSuccCorsiTassi.Kripke
 
 namespace multiSucc
 open multiSucc

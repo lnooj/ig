@@ -1,16 +1,7 @@
-import Mathlib.Tactic.Linarith.Frontend
-import Mathlib.Tactic.SimpRw
-import Mathlib.Data.Prod.Lex
-import Mathlib.Data.Multiset.Basic
-import Mathlib.Data.Multiset.UnionInter
-import Mathlib.Logic.Equiv.Defs
-import Mathlib.Data.List.Lemmas
-import Mathlib.Data.List.Dedup
 import Mathlib.Data.List.Lex
-import Mathlib.Data.Multiset.Sort
-import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Union
 import Mathlib.Data.Finset.Card
+import Mathlib.Data.Prod.Lex
 
 import Logic.MultiSuccCorsiTassi.Core
 
@@ -60,28 +51,12 @@ def toPair (w : Weight) : ℕ × ℕ := (w.cap_r, w.n)
 instance : LT Weight :=
   ⟨fun a b => (toLex (toPair a) : ℕ ×ₗ ℕ) < toLex (toPair b)⟩
 
-/-  @[grind]
-def lt (a b : Weight ) := a.cap_r < b.cap_r ∨ a.cap_r = b.cap_r ∧ a.n < b.n
- -/
 
  @[simp, grind =]
 theorem lt_iff {a b : Weight } : a < b ↔ a.cap_r < b.cap_r ∨ a.cap_r = b.cap_r ∧ a.n < b.n := by
   simpa [Weight.toPair] using
     (Prod.Lex.toLex_lt_toLex (x := toPair a) (y := toPair b))
-/-
-@[simp, grind]
-theorem mk_lt_mk {a₁ a₂ b₁ b₂ : ℕ} :
-    ({ cap_r := a₁, n := a₂ } : Weight) < { cap_r := b₁, n := b₂ }
-      ↔ a₁ < b₁ ∨ a₁ = b₁ ∧ a₂ < b₂ := by
-  rfl -/
 
-/- @[simp]
-theorem lt_toLex_iff (a b : Weight) :
-  ((toLex (a.cap_r, a.n) : ℕ ×ₗ ℕ) < (toLex (b.cap_r, b.n) : ℕ ×ₗ ℕ)) ↔ a < b := by
-  simpa [Weight.lt] using
-    (Prod.Lex.toLex_lt_toLex
-      (x := (a.cap_r, a.n)) (y := (b.cap_r, b.n)))
- -/
 @[simp, grind]
 instance instWellFoundedRelation : WellFoundedRelation (Weight ) where
   rel a b := a < b
@@ -91,7 +66,6 @@ instance instWellFoundedRelation : WellFoundedRelation (Weight ) where
     convert rel'.wf with a b
 
 end Weight
-
 
 @[simp, grind]
 def collectImpsForm (x : Form) : Finset Imp :=
@@ -138,10 +112,6 @@ let n :=
       --let cImpL := size_sum imps₁
       let cImpR := size_sum (p.impR.map Imp.toForm)
       cL + cR + cImpR--+ cImpL + cImpR
-/- let h : p.r.card ≤ p.cap.card := by
-  simp only [Seq4Proof.cap, Finset.union_assoc, Seq4Proof.r];
-  apply (Finset.card_le_card ?_); grind
-let hr : p.r.card ≤ cap :=  Nat.le_trans h hcap -/
 { cap_r := r , n := n}
 
 @[simp, grind]
@@ -219,7 +189,6 @@ theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
       have ⟨h₁, h₂⟩ := ih xatom xatom_in
       exact ⟨h₁, List.Mem.tail _ h₂⟩
 
---TODO theorem: when findIntersection empty, no overlapping atoms in either lists
 theorem noIntersection (xs : List Atom) (ys : List Atom) :
   (findIntersection xs ys) = [] → (∀ x ∈ xs, x ∉ ys) ∧ (∀ y ∈ ys, y ∉ xs ):=
   λ h => by
@@ -234,3 +203,5 @@ theorem noIntersection (xs : List Atom) (ys : List Atom) :
     simp [h] at this
 
 end multiSucc
+
+#min_imports

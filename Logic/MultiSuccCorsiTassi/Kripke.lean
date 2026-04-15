@@ -5,22 +5,17 @@ import Logic.MultiSuccCorsiTassi.Helper
 namespace multiSucc
 open multiSucc
 
+/-! # Kripke Semantics definitions -/
 structure World where
   forced : Finset Atom
   unforced : Finset Atom
- -- prop : Disjoint forced unforced
 deriving DecidableEq
---TODO PROOF OF MONOTONICITY. FORCED STAY FORCED. u is if c isnt in any.
--- unforced vastupidi
---wellFormed World
+
 def Seq4Proof.forced (s : Seq4Proof) : Finset Atom := s.as.toFinset
 
 def Seq4Proof.unforced (s : Seq4Proof) : Finset Atom := s.bs.toFinset
 
-def Seq4Proof.world (p : Seq4Proof) : World := ⟨p.forced, p.unforced⟩ -- , Finset.disjoint_sdiff⟩
-
--- attribute [grind .] World.prop
-
+def Seq4Proof.world (p : Seq4Proof) : World := ⟨p.forced, p.unforced⟩
 
 structure Model where
   world : World
@@ -97,7 +92,7 @@ theorem Model.all_wf {m m' : Model} (wf : m.wf) (mem : m' ∈ m.all) : m'.wf := 
       apply ih a h₁ h₂
 
 
-/--Truth Value: true, false, unknown -/
+/-! # Truth values for evaluation -/
 inductive TV  where
 | t : TV
 | f : TV
@@ -160,8 +155,7 @@ instance disjTV_associative : Std.Associative disjTV where
 assoc a b c := by cases a <;> cases b <;> cases c <;> rfl
 
 
-
-
+/-! # Main evaluation function -/
 @[grind]
 def Form.eval : Form → Model → TV
 | .atoms a, m => if a ∈ m.world.forced then .t
@@ -323,7 +317,7 @@ lemma evalAntB_false (h₁ : f ∈ s.Γb) (h₂ : evalBlocked f m = TV.f) : s.ev
 
 
 
---IMP EVAL--
+/-! # implication theorems -/
 theorem eval_imp_true_iff :
   (a ⊃ b).eval m = TV.t ↔
     ((a.eval m = .f ∨ b.eval m = .t) ∧ (m.branch.all (λ m' => (a ⊃ b).eval m' = .t))) := by
@@ -389,13 +383,9 @@ theorem mmmmm {bl : List Imp} :
   ∀ x ∈ bl, evalBlocked x m = TV.t →  ∀ x ∈ bl, (x.f ⊃ x.g).eval m' = TV.t := by sorry
 --MONOTONICITY--
 
-/-
-same as mode_branch_mono
-theorem mono_true_form {a : Form} {m : Model} :
-  ( a.eval m = .t) → (∀ x ∈ m.branch, a.eval x = .t)  := by sorry -/
 
 
---TODO IMPORTANT
+/-! # Truth monotonicity -/
 @[grind ., simp]
 theorem Model.momo_branch_true {f : Form} {m m' : Model}
   (wf : m.wf) (mem : m' ∈ m.branch) (ftv : f.eval m = TV.t) :
@@ -434,7 +424,6 @@ theorem Model.momo_branch_true {f : Form} {m m' : Model}
     obtain ⟨h₁, h₂⟩ := ftv
     grind
 
--- IN USE
 theorem Model.mono_all_true {f : Form} {m m' : Model}
   (wf : m.wf) (mem : m' ∈ m.all) (ftv : f.eval m = TV.t) :
   f.eval m' = TV.t := by
@@ -452,6 +441,7 @@ theorem Model.mono_all_true {f : Form} {m m' : Model}
 termination_by (m.depth)
 decreasing_by exact depth_lt_of_mem h₁
 
+/-! # Falsity monotonicity proof -/
 @[grind ., simp]
 theorem Model.mono_branch_false {f : Form} {m m' : Model}
   (wf : m.wf) (mem : m' ∈ m.branch ) (ftv : f.eval m' = .f) :
@@ -464,7 +454,7 @@ theorem Model.mono_branch_false {f : Form} {m m' : Model}
   obtain ⟨mf', fo, unfo⟩ := h
   match f with
   | .atoms a =>
-    apply evalute_atom_f_and at ftv; simp [Form.eval]; grind -- NEED DISJONINT PROOF ?!!? NO???
+    apply evalute_atom_f_and at ftv; simp [Form.eval]; grind
   | .bot => grind
   | .and a b =>
     simp_all
@@ -504,30 +494,6 @@ theorem eval_imp_righ_wo_ys' :
   . specialize h₁ m' (by sorry) (by sorry) (by sorry)
     contradiction -/
 
-/- theorem mono_false_all_branch {f : Form} {m m' a : Model}
-  (wf : m.wf) (mem : a ∈ m.branch) (mem' : m' ∈ a.all ) (ftv : f.eval m' = .f)  :
-  f.eval a = .f := by
-  rw [Model.all] at mem'; simp at mem'
-  rcases mem' with id | ⟨mm, h₁, h₂⟩
-  . grind
-  . have awf : a.wf = true := by rw [Model.wf] at wf; simp at wf; grind
-    have mmwf : mm.wf = true := by rw [Model.wf] at awf; simp at awf; grind
-    sorry
-    --have : f.eval mm = .f := Model.mono_branch_false mmwf mem ftv
-    --exact mono_false_all_branch (by sorry) h₁ h₂
-
-
-theorem mono_false_form_all {f : Form} {m m' : Model}
-  (wf : m.wf) (mem : m' ∈ m.all ) (ftv : f.eval m' = .f) :
-  f.eval m = .f  := by
-  rw [Model.all] at mem
-  simp_all
-  rcases mem with h | ⟨a, h₁, h₂⟩
-  . grind
-  . have h := mono_false_all_branch wf h₁ h₂ ftv
-    have wf' : m'.wf = true := Model.all_wf wf (by grind)
-    exact Model.mono_branch_false wf h₁ h -/
-
 
 theorem imp_false_branch {a b : Form} {m m' : Model}
 (mem : m' ∈ m.branch) (h : (a ⊃ b).eval m' = TV.f) (wf : m.wf) :
@@ -542,7 +508,7 @@ b.eval m = TV.f := by
 termination_by (m.depth)
 decreasing_by exact depth_lt_of_mem mem
 
--- IN USE
+/-! # right side of imp importance -/
 theorem imp_false_then_b_false  (impF : (a ⊃ b).eval m = TV.f) (wf : m.wf) : b.eval m = .f := by
   rw [eval_imp_false_iff] at impF
   cases impF with
@@ -551,7 +517,7 @@ theorem imp_false_then_b_false  (impF : (a ⊃ b).eval m = TV.f) (wf : m.wf) : b
     rcases h with ⟨m', mem, h₂⟩
     exact imp_false_branch mem h₂ wf
 
---IN USE
+
 theorem b_true_then_imp_true_branch {a b : Form} (wf : m.wf) (bT : b.eval m = TV.t) : (a ⊃ b).eval m = TV.t := by
   rw [eval_imp_true_iff]
   constructor
