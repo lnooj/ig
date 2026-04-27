@@ -2,15 +2,10 @@ import Mathlib.Data.Nat.Cast.Order.Ring
 
 import Logic.MultiSuccCorsiTassi.Display
 import Logic.MultiSuccCorsiTassi.Result
+import Logic.MultiSuccCorsiTassi.Termination
+import Logic.MultiSuccCorsiTassi.Helper
 
 
-def List.mapNonempty {α β : Type*} (f : α → β) (xs : List α) (h : xs ≠ []) : {ys : List β // ys ≠ []} :=
-  ⟨xs.map f, by simp [h]⟩
-
-def List.unattach_ne (hnotempty : ¬rfs = []) : ¬rfs.unattach = [] := by
-  intro h
-  have : rfs.unattach = [] → rfs = [] := by apply List.map_eq_nil_iff.mp
-  grind
 
 namespace multiSucc
 open multiSucc
@@ -18,112 +13,6 @@ open multiSucc
 --deriving Repr
 open Proof
 open Refutation
-
-/-! # choices -/
--- [[1,2] [3] [4,5]] = [[1,3,4] [1,3,5] [2,3,4] [2,3,5]]
-def choices : List (List CM) → List (List CM)
-| [] => []
-| [x] => x.map ([·])
-| x::y::xs => x.product (choices (y::xs)) |>.map (fun ⟨a, as⟩ ↦ a :: as)
-
-@[grind =, simp]
-theorem choices_eq_nil {xs : List (List α)} : choices xs = [] ↔ xs = [] ∨ [] ∈ xs := by
-  fun_induction choices with
-  | case1 => simp
-  | case2 => simp
-  | case3 => simp_all; grind only [= List.prodcut_eq_nil]
-
-@[grind ., simp]
-theorem mem_of_mem_choices {xss : List (List α)} {xs : List α} {c : List α}
-  (hc : c ∈ choices xss) (hxs : xs ∈ xss) : ∃ x ∈ xs, x ∈ c := by
-  induction xss generalizing c with
-  | nil =>
-      cases hxs
-  | cons x xss ih =>
-      cases xss with
-      | nil =>
-          simp [choices] at hc hxs
-          rcases hc with ⟨y, hy, rfl⟩
-          subst hxs
-          exact ⟨y, hy, by simp⟩
-      | cons y ys =>
-          rw [choices] at hc
-          simp_all
-          grind
-
-/-! # pickproof -/
-/-- Picks only proofs (α) if any, else returns all the refutations (β)
-if .inl (proof) is returned, it is never empty, if .inr is returned, it is the length of the original input list -/
-def pickProof : List (α ⊕ β) → List (α) ⊕ List (β)
-  | [] => .inr [] --empty refutation
-  | x::xs =>
-    match x, pickProof xs with
-    | .inl a, .inl as => .inl (a::as)
-    | .inl a, .inr _  => .inl [a] --single proof
-    | .inr _, .inl as => .inl as
-    | .inr b, .inr bs => .inr (b::bs) --all refutations
-
-attribute [local grind =] List.filterMap_eq_nil_iff in
-@[grind .]
-theorem pickProof_eq {xs : List (α ⊕ β)} {ys : List α ⊕ List β} :
-    pickProof xs = ys ↔
-      match ys with
-      | .inl as => xs.filterMap Sum.getLeft? = as ∧ as ≠ []
-      | .inr bs => xs = bs.map .inr := by
-  fun_induction pickProof generalizing ys <;> rcases ys <;> simp_all <;> try grind [cases List]
-
-@[simp, grind =]
-theorem pickProof_eq_inl {xs : List (α ⊕ β)} {ys : List α} :
-    pickProof xs = .inl ys ↔ xs.filterMap Sum.getLeft? = ys ∧ ¬ys = [] := by simp [pickProof_eq]
-@[simp, grind =]
-theorem pickProof_eq_inr {xs : List (α ⊕ β)} {ys : List β} :
-    pickProof xs = .inr ys ↔ xs = ys.map .inr := by simp [pickProof_eq]
-
-
-/-! # other -/
-theorem subtype_val_flatten_notEmpty
-(pf : List { pfs // pfs ≠ [] })
-(h : pickProof impRApplications = Sum.inl pf)
-: (List.map Subtype.val pf).flatten ≠ [] := by
-  simp [pickProof_eq_inl] at h
-  rcases h with ⟨h₁, h₂⟩
-  cases pf with
-  | nil =>
-      cases h₂ rfl
-  | cons x xs => simp [x.property]
-
-@[grind ., simp]
-theorem List.findSome?_ne_none_of_mem {xs : List α} {f : α → Option β} {x : α}
-  (hx : x ∈ xs) (hfx : f x ≠ none) : xs.findSome? f ≠ none := by grind
-
-
-@[grind ., simp]
-theorem Subtype.prop_map
-(rfs : List { rf : List ((a : Form) ×
-          (b : Form) ×
-            Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
-              ({ f := a, g := b } :: hist)) // rf ≠ [] }) : [] ∉ rfs.unattach := by
-  simp_all only [ne_eq, List.mem_unattach, not_true_eq_false, IsEmpty.exists_iff, not_false_eq_true]
-
-
-@[grind .]
-theorem impR_cap
-(block : List Imp)
-(hist : List Imp)
-(impR : List Imp)
-(ha : { f := f, g := g } ∈ impR)
-: insert { f := f, g := g }
-    (collectImpsForm f ∪
-      ((List.map Imp.toForm block).toFinset.biUnion collectImpsForm ∪ (collectImpsForm g ∪ hist.toFinset))) ⊆
-  block.toFinset.biUnion collectImpsImp ∪ (impR.toFinset.biUnion collectImpsImp ∪ hist.toFinset) := by
-  have inclusion : insert { f, g } ( collectImpsForm f ∪ collectImpsForm g) ⊆ impR.toFinset.biUnion collectImpsImp := by
-    intro x hx
-    simp at hx
-    rcases hx with head | tail₁ | tail₂
-    all_goals simp_all; grind
-  have eq : block.toFinset.biUnion collectImpsImp = (block.map Imp.toForm).toFinset.biUnion collectImpsForm := by ext x; simp [Finset.mem_biUnion]
-  grind
-
 
 
 /- METARULES

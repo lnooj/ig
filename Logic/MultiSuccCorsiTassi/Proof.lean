@@ -1,4 +1,4 @@
-import Logic.MultiSuccCorsiTassi.Helper
+import Logic.MultiSuccCorsiTassi.Core
 
 namespace multiSucc
 open multiSucc

@@ -1,206 +1,140 @@
-import Mathlib.Data.List.Lex
-import Mathlib.Data.Finset.Union
-import Mathlib.Data.Finset.Card
-import Mathlib.Data.Prod.Lex
+import Mathlib.Data.Nat.Cast.Order.Ring
+import Mathlib.Algebra.BigOperators.Ring.List
+import Mathlib.Algebra.GroupWithZero.Nat
+import Mathlib.Data.List.ProdSigma
 
 import Logic.MultiSuccCorsiTassi.Core
+import Logic.MultiSuccCorsiTassi.Refutation
+
+
+
+def List.mapNonempty {α β : Type*} (f : α → β) (xs : List α) (h : xs ≠ []) : {ys : List β // ys ≠ []} :=
+  ⟨xs.map f, by simp [h]⟩
+
+def List.unattach_ne (hnotempty : ¬rfs = []) : ¬rfs.unattach = [] := by
+  intro h
+  have : rfs.unattach = [] → rfs = [] := by apply List.map_eq_nil_iff.mp
+  grind
 
 namespace multiSucc
 open multiSucc
 
-/-
-Atomic values get valued as one , not as 0, to help show termination for the atomic case in antecedent, same with bottom.
- -/
-@[simp, grind]
-def sizeOf_Form : Form → Nat
-  | ⊥ => 1
-  | .atoms _ => 1
-  | .and p q => 1 + sizeOf_Form p + sizeOf_Form q
-  | .or p q => 1 + sizeOf_Form p + sizeOf_Form q
-  | .imp p q => 1 + sizeOf_Form p + sizeOf_Form q
-
---complexity of set of principle formulas: nr of logical symbols occuring in them
-@[grind,simp]
-def size_sum : List Form → Nat
-  | [] => 0
-  | f :: fs => 2 * sizeOf_Form f + size_sum fs
-
-@[grind,simp]
-def size_sum_increased : List Form → Nat
-  | [] => 0
-  | f :: fs => 2 * sizeOf_Form f + 1 + size_sum_increased fs
-
-
-/-- weight function based on paper to prove termination :
-- (r,n) where r is nr of R→ occurences there has been in this branch
-- cap_r is the difference of the max r value and current and
-- n is the complexity of the set of forms that can be used as principle to any rule
--/
-@[grind]
-structure Weight where
-  cap_r : ℕ -- cap - r
-  n : ℕ
-  --hr : r ≤ cap
-
-namespace Weight
--- now it is a Lex order
-@[simp, grind]
-def toPair (w : Weight) : ℕ × ℕ := (w.cap_r, w.n)
-
-@[simp, grind]
-instance : LT Weight :=
-  ⟨fun a b => (toLex (toPair a) : ℕ ×ₗ ℕ) < toLex (toPair b)⟩
-
-
- @[simp, grind =]
-theorem lt_iff {a b : Weight } : a < b ↔ a.cap_r < b.cap_r ∨ a.cap_r = b.cap_r ∧ a.n < b.n := by
-  simpa [Weight.toPair] using
-    (Prod.Lex.toLex_lt_toLex (x := toPair a) (y := toPair b))
-
-@[simp, grind]
-instance instWellFoundedRelation : WellFoundedRelation (Weight ) where
-  rel a b := a < b
-  wf := by
-    let rel' : WellFoundedRelation Weight :=
-      invImage (fun x ↦ (toLex x.toPair : ℕ ×ₗ ℕ)) Prod.Lex.instWellFoundedRelationLexOfWellFoundedLT
-    convert rel'.wf with a b
-
-end Weight
-
-@[simp, grind]
-def collectImpsForm (x : Form) : Finset Imp :=
-match x with
-  | .bot | .atoms _ =>  ∅
-  | .and a b | .or a b => collectImpsForm a ∪ collectImpsForm b
-  | .imp a b => {⟨a, b⟩} ∪ collectImpsForm a ∪ collectImpsForm b
-
-@[simp, grind]
-def collectImpsImp (x : Imp) : Finset Imp := {x} ∪ collectImpsForm x.f ∪ collectImpsForm x.g
+/-! # choices -/
+-- [[1,2] [3] [4,5]] = [[1,3,4] [1,3,5] [2,3,4] [2,3,5]]
+def choices : List (List α) → List (List α)
+| [] => []
+| [x] => x.map ([·])
+| x::y::xs => x.product (choices (y::xs)) |>.map (fun ⟨a, as⟩ ↦ a :: as)
 
 @[simp, grind =]
-theorem collectImps_equality : ∀ (x : Imp), collectImpsImp x = collectImpsForm (x.toForm) :=
-  by simp only [collectImpsImp, Finset.singleton_union, Finset.insert_union, Imp.toForm, collectImpsForm, implies_true]
+theorem product_length {as : List α} {bs : List β} :
+    (as.product bs).length = as.length * bs.length := by
+  simp [List.product, List.map_const']
 
-/-- Limit for our Weight relatiom
-- cap represents the max nr of forms that can be the principal for R→,
-- it is a Finset (not a List as before), because any imp form can be principal of R→ ONLY ONCE, so we dont care about order nor duplicates
-- we need it to still be a set, not just it's cardinality to show subset relations in proof (no new implications are made, set will only get smaller)
-- cardinality of this set is used for proving well-foundedness
-- every imp list is gone through recursively to collect ALL implications, exept the R→ list itsself (history)-/
-@[simp, grind]
-def Seq4Proof.cap (p : Seq4Proof) : Finset Imp:=
-   p.fL.toFinset.biUnion collectImpsForm ∪ p.block.toFinset.biUnion collectImpsImp ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
-  p.fR.toFinset.biUnion collectImpsForm ∪ p.impR.toFinset.biUnion collectImpsImp ∪ p.hist.toFinset -- rightImp gets also counted recursively, because when applying R→ the left and right side go to forms
+attribute [grind =] List.pair_mem_product
 
-/-- occurences of R→ rule so far, stored in history  -/
-@[simp, grind]
-def Seq4Proof.r (p: Seq4Proof) : Finset Imp := p.hist.toFinset
-
+@[simp, grind =]
+theorem choices_length {xs : List (List α)} :
+    (choices xs).length = if xs = [] then 0 else (xs.map (·.length)).prod := by
+  fun_induction choices with grind
 @[simp, grind .]
-theorem Seq4Proof.r_subset_cap (p : Seq4Proof) : p.r ⊆ p.cap := by simp only [r, cap, Finset.union_assoc]; grind
+theorem mem_choices_length {xs : List (List α)} {x} (h : x ∈ choices xs) :
+    x.length = xs.length := by
+  fun_induction choices generalizing x with grind
 
-/-- Local sequents Weight function
-- given a sequent p, global cap.card and proof that current sequents cap is smaller than global
-- sixeOf_Form is used, not complexity, for some cases this doesn't change
-- the forms list size must be higher than the imp lists, for in our recursive calls we might only move the implications to appropriate lists,
-  functionally doing nothing but it still must decrease. atoms donn't make a difference here -/
-def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ)  : Weight :=
-let r := cap - p.r.card
-let n :=
-      let cL := size_sum p.fL--(countPrinciple forms₁ blocked)-- forms in blocked can not be principle PRINCIPLE LOGIC NOT USED
-      let cR := size_sum_increased p.fR --any imp on right side can be principle, bc either a fort is used or R→
-      --let cImpL := size_sum imps₁
-      let cImpR := size_sum (p.impR.map Imp.toForm)
-      cL + cR + cImpR--+ cImpL + cImpR
-{ cap_r := r , n := n}
-
-@[simp, grind]
-theorem Seq4Proof.weight_cap_r (p : Seq4Proof) (cap : ℕ) :
-    (p.weight cap).cap_r = cap - p.r.card := by
-  simp [Seq4Proof.weight]
-
-@[simp, grind]
-theorem Seq4Proof.weight_n (p : Seq4Proof) (cap : ℕ) :
-    (p.weight cap).n =
-      size_sum p.fL + size_sum_increased p.fR + size_sum (p.impR.map Imp.toForm) := by
-  simp [Seq4Proof.weight]
+@[grind =, simp]
+theorem products_eq_nil {xs : List (List α)} : choices xs = [] ↔ xs = [] ∨ [] ∈ xs := by
+  grind [List.eq_nil_iff_length_eq_zero, choices_length, List.prod_eq_zero_iff, List.length_eq_zero_iff]
 
 
+@[grind ., simp]
+theorem mem_of_mem_choices {xss : List (List α)} {xs : List α} {c : List α}
+  (hc : c ∈ choices xss) (hxs : xs ∈ xss) : ∃ x ∈ xs, x ∈ c := by
+  induction xss generalizing c with
+  | nil =>
+      cases hxs
+  | cons x xss ih =>
+      cases xss with
+      | nil =>
+          simp [choices] at hc hxs
+          rcases hc with ⟨y, hy, rfl⟩
+          subst hxs
+          exact ⟨y, hy, by simp⟩
+      | cons y ys =>
+          rw [choices] at hc
+          simp_all
+          grind
 
-/-
-needed to find all possible pairings (of proofs) for cases like or, and ...
- -/
-def getPairs (xs : List α ) (ys : List β ) : List (α × β) :=
-  match xs with
-  | [] => []
-  | x::xs' => List.map (λ y => (x , y)) ys ++ getPairs xs' ys
-
-#eval [1,2,3,3,4] ∩ [1,3,3]
-/- find common atoms in anticident atoms list and succedent atoms list.
-  current: wo duplicates
-  Maybe return positions, to be precise, List (Atom, (index from xs, index from ys)) -/
-def findIntersection : List Atom → List Atom → List Atom
--- xs.filter (fun a => a ∈ ys) |>.eraseDups
-  | _ ,[] => []
-  | xs, y::ys =>
-    if y ∈ xs then
-      if y ∈ findIntersection xs ys then
-        findIntersection xs ys
-      else y :: findIntersection xs ys
-    else findIntersection xs ys
-
-
-theorem mem_findIntersection_iff (x : Atom) :
-  x ∈ findIntersection xs ys ↔ x ∈ xs ∧ x ∈ ys := by
-  induction ys with
-  | nil => simp [findIntersection]
-  | cons y ys ih =>
-    unfold findIntersection
-    by_cases hxy : y ∈ xs
+@[grind =]
+theorem mem_products {xs : List (List α)} {x} :
+      x ∈ choices xs
+    ↔ ¬x = [] ∧ x.length = xs.length ∧
+      ∀ i, (h : i < x.length) → (h' : i < xs.length) → x[i]'h ∈ xs[i]'h' := by
+  fun_induction choices generalizing x with
+  | case1 => grind
+  | case2 y =>
+    constructor
     · grind
-    . grind
+    · simp only [List.length_cons, List.length_nil]; grind [cases List]
+  | case3 y y' xs ih =>
+    constructor
+    · grind
+    · simp only [List.length_cons]; intro ⟨_, _, h⟩; have := h 0; grind [Prod.exists, cases List]
 
-theorem findIntersCorr (xs : List Atom) (ys : List Atom) :
-  ∀ x ∈ (findIntersection xs ys), x ∈ xs ∧ x ∈ ys :=
-  λ xatom xatom_in =>
-  match ys with
-  | [] => by simp [findIntersection] at xatom_in
-  | y' :: ys' => by
-    unfold findIntersection at xatom_in
-    by_cases cond₁: y' ∈ xs
-    . simp [cond₁] at xatom_in
-      by_cases cond₂: y' ∈ findIntersection xs ys'
-      . simp [cond₂] at xatom_in
-        have ih := findIntersCorr xs ys'
-        have ⟨h₁, h₂⟩ := ih xatom xatom_in
-        exact ⟨h₁, List.Mem.tail _ h₂⟩
-      . simp [cond₂] at xatom_in
-        match xatom_in with
-        | Or.inl left =>
-          simp [left] at xatom_in
-          subst left
-          exact ⟨ cond₁, List.mem_cons_self⟩
-        | Or.inr right =>
-          have ih := findIntersCorr xs ys'
-          have ⟨h₁, h₂⟩ := ih xatom right
-          exact ⟨h₁, List.mem_cons_of_mem _ h₂ ⟩
-    . simp [cond₁] at xatom_in
-      have ih := findIntersCorr xs ys'
-      have ⟨h₁, h₂⟩ := ih xatom xatom_in
-      exact ⟨h₁, List.Mem.tail _ h₂⟩
+/-! # pickproof -/
+/-- Picks only proofs (α) if any, else returns all the refutations (β)
+if .inl (proof) is returned, it is never empty, if .inr is returned, it is the length of the original input list -/
+def pickProof : List (α ⊕ β) → List (α) ⊕ List (β)
+  | [] => .inr [] --empty refutation
+  | x::xs =>
+    match x, pickProof xs with
+    | .inl a, .inl as => .inl (a::as)
+    | .inl a, .inr _  => .inl [a] --single proof
+    | .inr _, .inl as => .inl as
+    | .inr b, .inr bs => .inr (b::bs) --all refutations
 
-theorem noIntersection (xs : List Atom) (ys : List Atom) :
-  (findIntersection xs ys) = [] → (∀ x ∈ xs, x ∉ ys) ∧ (∀ y ∈ ys, y ∉ xs ):=
-  λ h => by
-  constructor
-  . intro x hx hxy
-    have : x ∈ findIntersection xs ys :=
-      (mem_findIntersection_iff x).2 ⟨hx, hxy⟩
-    simp [h] at this
-  . intro y hy hyx
-    have : y ∈ findIntersection xs ys :=
-      (mem_findIntersection_iff y).2 ⟨hyx, hy⟩
-    simp [h] at this
+attribute [local grind =] List.filterMap_eq_nil_iff in
+@[grind .]
+theorem pickProof_eq {xs : List (α ⊕ β)} {ys : List α ⊕ List β} :
+    pickProof xs = ys ↔
+      match ys with
+      | .inl as => xs.filterMap Sum.getLeft? = as ∧ as ≠ []
+      | .inr bs => xs = bs.map .inr := by
+  fun_induction pickProof generalizing ys <;> rcases ys <;> simp_all <;> try grind [cases List]
+
+@[simp, grind =]
+theorem pickProof_eq_inl {xs : List (α ⊕ β)} {ys : List α} :
+    pickProof xs = .inl ys ↔ xs.filterMap Sum.getLeft? = ys ∧ ¬ys = [] := by simp [pickProof_eq]
+@[simp, grind =]
+theorem pickProof_eq_inr {xs : List (α ⊕ β)} {ys : List β} :
+    pickProof xs = .inr ys ↔ xs = ys.map .inr := by simp [pickProof_eq]
+
+/-! # other -/
+theorem subtype_val_flatten_notEmpty
+(pf : List { pfs // pfs ≠ [] })
+(h : pickProof impRApplications = Sum.inl pf)
+: (List.map Subtype.val pf).flatten ≠ [] := by
+  simp [pickProof_eq_inl] at h
+  rcases h with ⟨h₁, h₂⟩
+  cases pf with
+  | nil =>
+      cases h₂ rfl
+  | cons x xs => simp [x.property]
+
+@[grind ., simp]
+theorem List.findSome?_ne_none_of_mem {xs : List α} {f : α → Option β} {x : α}
+  (hx : x ∈ xs) (hfx : f x ≠ none) : xs.findSome? f ≠ none := by grind
+
+
+@[grind ., simp]
+theorem Subtype.prop_map
+(rfs : List { rf : List ((a : Form) ×
+          (b : Form) ×
+            Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+              ({ f := a, g := b } :: hist)) // rf ≠ [] }) : [] ∉ rfs.unattach := by
+  simp_all only [ne_eq, List.mem_unattach, not_true_eq_false, IsEmpty.exists_iff, not_false_eq_true]
+
+
 
 end multiSucc
 

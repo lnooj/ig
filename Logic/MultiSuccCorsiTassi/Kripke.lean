@@ -1,6 +1,5 @@
-import Logic.MultiSuccCorsiTassi.Core
-import Logic.MultiSuccCorsiTassi.Helper
---import Logic.MultiSuccCorsiTassi.Display
+
+import Logic.MultiSuccCorsiTassi.Termination
 
 namespace multiSucc
 open multiSucc
