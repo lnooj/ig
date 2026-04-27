@@ -60,6 +60,7 @@ structure Sequent where
   Γb : Multiset Imp -- blocked implication seperate, seperate semantics
   Δ : Multiset Form
 
+@[grind, simp]
 def Sequent.Γ (s : Sequent) := s.Γa ∪ s.Γb.map Imp.toForm
 
 

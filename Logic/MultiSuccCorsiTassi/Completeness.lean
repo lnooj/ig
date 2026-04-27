@@ -1,4 +1,5 @@
 import Logic.MultiSuccCorsiTassi.Refutation
+import Logic.MultiSuccCorsiTassi.Kripke
 
 
 namespace multiSucc
@@ -23,7 +24,7 @@ match ref with
   let children : List Model := ys.attach.map (λ ⟨⟨a, b⟩, yh⟩ ↦ (prem a b yh ).getCM)
   let cUn := Models.getUnforced children
   ⟨⟨as.toFinset, bs.toFinset ∪ cUn⟩, children⟩
-  -- add children.unforced to bs. this is necessary bc without it you can't prove ref.getCM.wf. goal would be b ∈ bs which is not true
+  -- add children.rejected to bs. this is necessary bc without it you can't prove ref.getCM.wf. goal would be b ∈ bs which is not true
 
 
 @[simp, grind .]
@@ -32,8 +33,8 @@ theorem Refutation.ant_atom_forced (r : Refutation s h)
   induction r generalizing a <;> simp_all
 
 @[simp, grind .]
-theorem Refutation.ant_atom_unforced (r : Refutation s h)
-  (ha : Form.atoms a ∈ s.Δ) : a ∈ r.getCM.world.unforced := by
+theorem Refutation.ant_atom_refected (r : Refutation s h)
+  (ha : Form.atoms a ∈ s.Δ) : a ∈ r.getCM.world.rejected := by
   induction r generalizing a <;> simp_all
 
 /- def Result.getCMs (r : Result s b h) : List Model :=
@@ -56,14 +57,14 @@ theorem Refutation.cm_wf (r : Refutation s h) : r.getCM.wf := by
       exact ha_forced
     . intro b hb
       suffices mm : b ∈ Models.getUnforced (ys.attach.map (fun ⟨⟨a, b⟩, h⟩ => (prem a b h).getCM)) by simp_all
-      have hmem : b ∈ (prem f g imp_in).getCM.world.unforced := by grind
+      have hmem : b ∈ (prem f g imp_in).getCM.world.rejected := by grind
       apply Models.getUnforced_elem (by grind) b hmem
 
 
 /- TODO: problem with proving that all left imp sides in hist list evaluate to true -/
 theorem Refutation.correctness :
   ∀ (s : Sequent) ( r : Refutation s h) (_ : r.getCM.wf ),
-      s.eval r.getCM = TV.f := by
+      s.evalR r.getCM = TV.f := by
   intro s r wf
   induction r with
   | ax hs as bs bl i =>

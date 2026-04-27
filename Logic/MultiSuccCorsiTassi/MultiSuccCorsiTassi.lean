@@ -330,6 +330,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 -- Pierce ((p → q )→ p) → p
 #eval! automatedProofHelper (seq {⊢ (((p → q )→ p) → p)})
 #eval! automatedProofHelper (seq {⊢ (p ∨ ¬p )})
+#eval! automatedProofHelper (seq {⊢ (((p → r) → p) → r)})
 --#eval! evaluate (form {((¬ p → ¬ q) → (q → p))})
 #print axioms automatedProofHelper
 end multiSucc

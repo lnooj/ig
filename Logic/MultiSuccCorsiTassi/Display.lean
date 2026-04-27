@@ -32,7 +32,7 @@ instance : ToString Form := ⟨Form.toString⟩
 instance : ToString World where
   toString world :=
   String.intercalate ", " (world.forced.sort.map toString)
-    ++ " ⊢ " ++ String.intercalate ", " (world.unforced.sort.map toString)
+    ++ " ⊢ " ++ String.intercalate ", " (world.rejected.sort.map toString)
 
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
