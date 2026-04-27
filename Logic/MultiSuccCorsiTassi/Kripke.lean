@@ -11,9 +11,9 @@ structure World where
   rejected : Finset Atom
 deriving DecidableEq
 
-def Seq4Proof.forced (s : Seq4Proof) : Finset Atom := s.as.toFinset
+def Seq4Proof.forced (s : Seq4Proof) : Finset Atom := s.aL.toFinset
 
-def Seq4Proof.rejected (s : Seq4Proof) : Finset Atom := s.bs.toFinset
+def Seq4Proof.rejected (s : Seq4Proof) : Finset Atom := s.aR.toFinset
 
 def Seq4Proof.world (p : Seq4Proof) : World := ⟨p.forced, p.rejected⟩
 

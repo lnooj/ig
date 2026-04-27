@@ -71,10 +71,10 @@ This is required for easier algorithmic approach, where we can one by one open u
  -/
 @[grind]
 structure Seq4Proof where
-  as : List Atom
+  aL : List Atom
   fL : List Form
   block : List Imp
-  bs : List Atom
+  aR : List Atom
   fR : List Form
   impR : List Imp
   hist : List Imp
@@ -167,9 +167,9 @@ def Sequent.Δ_getList { s : Sequent} : List Form := Multiset.sort s.Δ LE.le
 
 @[simp]
 def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
-  have antPure := Multiset.ofList ((p.as.map Form.atoms) ++ p.fL)
+  have antPure := Multiset.ofList ((p.aL.map Form.atoms) ++ p.fL)
   have antBlocked := Multiset.ofList p.block
-  have succ := Multiset.ofList ((p.bs.map Form.atoms) ++ p.fR ++ (p.impR.map Imp.toForm))
+  have succ := Multiset.ofList ((p.aR.map Form.atoms) ++ p.fR ++ (p.impR.map Imp.toForm))
   ⟨antPure, antBlocked, succ⟩
 
 
