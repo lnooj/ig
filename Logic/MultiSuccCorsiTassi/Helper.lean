@@ -66,7 +66,7 @@ theorem mem_of_mem_choices {xss : List (List α)} {xs : List α} {c : List α}
           grind
 
 @[grind =]
-theorem mem_products {xs : List (List α)} {x} :
+theorem mem_choices {xs : List (List α)} {x} :
       x ∈ choices xs
     ↔ ¬x = [] ∧ x.length = xs.length ∧
       ∀ i, (h : i < x.length) → (h' : i < xs.length) → x[i]'h ∈ xs[i]'h' := by
@@ -110,10 +110,10 @@ theorem pickProof_eq_inr {xs : List (α ⊕ β)} {ys : List β} :
     pickProof xs = .inr ys ↔ xs = ys.map .inr := by simp [pickProof_eq]
 
 /-! # other -/
-theorem subtype_val_flatten_notEmpty
+theorem unattach_flatten_notEmpty
 (pf : List { pfs // pfs ≠ [] })
 (h : pickProof impRApplications = Sum.inl pf)
-: (List.map Subtype.val pf).flatten ≠ [] := by
+: (pf.unattach).flatten ≠ [] := by
   simp [pickProof_eq_inl] at h
   rcases h with ⟨h₁, h₂⟩
   cases pf with

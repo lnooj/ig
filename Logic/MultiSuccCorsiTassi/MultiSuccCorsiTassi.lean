@@ -5,6 +5,9 @@ import Logic.MultiSuccCorsiTassi.Result
 import Logic.MultiSuccCorsiTassi.Termination
 import Logic.MultiSuccCorsiTassi.Helper
 
+def List.findSome {α β : Type*} (xs : List α) (p : α → Bool) (f : (a : α) → p a → β) (h : ∃ a ∈ xs, p a) : β :=
+  xs.findSome? (λ a ↦ if h' : p a then some (f a h') else none ) |>.get (by simp_all)
+
 
 
 namespace multiSucc
@@ -13,6 +16,39 @@ open multiSucc
 --deriving Repr
 open Proof
 open Refutation
+
+@[grind ., simp]
+theorem mem_of_mem_choices_tagged
+  (impR hist block : List Imp)
+  (as : List Atom)
+  (rfs : List
+    { rf :
+        List ((a : Form) × (b : Form) ×
+          Refutation
+            { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+            ({ f := a, g := b } :: hist))
+      // rf ≠ [] })
+  (hrows :
+    ∀ x ∈ impR,
+      ∃ row ∈ rfs.unattach,
+        ∀ t ∈ row, t.1 = x.f ∧ t.2.1 = x.g)
+  {c : List ((a : Form) × (b : Form) ×
+      Refutation
+        { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+        ({ f := a, g := b } :: hist))}
+  {x : Imp}
+  (hx : x ∈ impR)
+  (hc : c ∈ multiSucc.choices rfs.unattach) :
+  ∃ r', ⟨x.f, x.g, r'⟩ ∈ c := by
+  obtain ⟨row, hrow, htags⟩ := hrows x hx
+  obtain ⟨t, htrow, htc⟩ := mem_of_mem_choices hc hrow
+  rcases t with ⟨a, b, r'⟩
+  have htag := htags ⟨a, b, r'⟩ htrow
+  simp at htag
+  rcases htag with ⟨ha, hb⟩
+  subst ha
+  subst hb
+  exact ⟨r', htc⟩
 
 
 /- METARULES
@@ -70,18 +106,31 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
 
             --let neqE : impRApplications.filterMap Sum.getLeft? = some ys
             match hpick : pickProof impRApplications with
-            | .inl pf => exact Result.proof (pf.map Subtype.val |>.flatten) (by grind [subtype_val_flatten_notEmpty])
+            | .inl pf => exact Result.proof (pf.unattach |>.flatten) (by grind [unattach_flatten_notEmpty])
             | .inr rfs =>
-              let choices := choices (rfs.map Subtype.val) --all dif ways to construct refutation
+              let choices := choices (rfs.unattach) --all dif ways to construct refutation
+              have hrows :
+                  ∀ x ∈ impR,
+                    ∃ row ∈ rfs.unattach,
+                      ∀ t ∈ row, t.1 = x.f ∧ t.2.1 = x.g := by
+                have jup : ∀ x ∈ choices, ¬x = [] ∧ x.length = (rfs.unattach).length ∧
+                        ∀ i, (h : i < x.length) → (h' : i < (rfs.unattach).length) → x[i]'h ∈ (rfs.unattach)[i]'h' :=
+                  by grind
+
+                sorry
+
               have ruleR := (Refutation.impr hist aL aR impR block (by grind)) --new parent to choices
               exact .refutation (choices.attach.map (λ ⟨c, h⟩ ↦
                                                 ruleR (λ a b hab ↦
-                                                      (c.findSome? (λ ⟨a', b', r'⟩ ↦ -- find the same imp in child as in parent
-                                                        if _ : a = a' ∧ b = b'
-                                                          then some (r'.castSeq (hb := by grind) (hh := by grind) (hc := by grind))
-                                                        else none)).get (by simp; sorry))--prove that same imps can be found in choices as in parent
+                                                      (c.findSome (λ ⟨a', b', r'⟩ ↦ a = a' ∧ b = b') -- find the same imp in child as in parent
+                                                                  (λ ⟨a', b', r'⟩ _ ↦ (r'.castSeq (hb := by grind) (hh := by grind) (hc := by grind)))
+                                                                  (by
+                                                                    obtain ⟨r', hr'⟩ :=
+                                                                      mem_of_mem_choices_tagged impR hist block aL rfs hrows hab (by simpa using h)
+                                                                    exact ⟨⟨a, b, r'⟩, hr', by simp⟩ )) --prove that same imps can be found in choices as in parent
+                                                      )
                                                     )
-                                ) (by simp [choices]; apply List.attach_eq_nil_iff.not.mpr; simp; apply List.unattach_ne (by simp_all))
+                                ) (by simp [choices]; apply List.attach_eq_nil_iff.not.mpr; simp; apply List.unattach_ne (by grind))
         | xs@(_::_) => by
           --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
           --have corr := findIntersCorr as bs
