@@ -10,20 +10,14 @@ namespace multiSucc
 open multiSucc
 
 
-
-
-/- TODO: problem with showing impr correctness, because of blocked implication semantics -/
 theorem proof_correctness :
   ∀ (s : Sequent) (_ : Proof s) (m : Model) (_ : m.wf), s.evalP m ≠ TV.f := by
   intro s pf m wf
   induction pf generalizing m with
   | ax x xs ys bl hxs hys =>
     simp
-    have hxsM : Form.atoms x ∈ (↑xs : Multiset Form) := by simpa
-    if xtv : x ∈ m.world.forced then
-      suffices evalSucc ↑ys m = TV.t by grind
-      apply evalSucc_true hys
-      grind
+    --have hxsM : Form.atoms x ∈ (↑xs : Multiset Form) := by simpa
+    if xtv : x ∈ m.world.forced then grind
     else if xtv' : x ∈ m.world.rejected then grind
     else grind
   | botl xs ys bl =>
@@ -78,11 +72,12 @@ theorem proof_correctness :
         grind [Model.mono_all_true]
 
   | impl a b xs ys bl prem1 prem2 ih₁ ih₂ =>
-    simp_all
+    simp
     intro h₁
     specialize ih₁ m wf
     specialize ih₂ m wf
     have hImp : (a ⊃ b).eval m = TV.t := h₁ (a ⊃ b) (by simp)
+    simp at ih₁ ih₂
     grind
 
   | afort a b xs ys bl prem ih =>

@@ -88,24 +88,31 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
           --METARULE 1 NONINVERTABLE REEGEL
           else by
             simp only [Seq4Proof.toSeq, List.append_nil]
-            have ⟨impRApplications, hnotempty⟩ :
+            let mkImpRApp :
+                {i : Imp // i ∈ impR} →
+                  {pf : List (Proof ⟨↑(aL.map Form.atoms), ↑block, ↑(aR.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
+                  {rf : List ((a b : Form) × Refutation ⟨↑(a :: aL.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
+                 := (λ (u : {i : Imp // i ∈ impR}) ↦
+                  match u with
+                  | ⟨⟨f, g⟩, ha⟩ =>
+                    have premise := automatedProof ⟨aL, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
+                                                    (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
+                    let xs := aL.map Form.atoms
+                    let ys := aR.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
+                    have ruleP := impr f g xs ys block
+                    match premise with
+                    | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
+                    | .refutation rf neqE => .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩), by simpa using neqE⟩)
+            let imprA :
             -- find either a list of proofs for any of the imps, if none found, get the function required to get ALL refutations
                 {l : List (
                   {pf : List (Proof ⟨↑(aL.map Form.atoms), ↑block, ↑(aR.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
                   {rf : List ((a b : Form) × Refutation ⟨↑(a :: aL.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
-                ) // l ≠ []} :=
-                impR.attach.mapNonempty (λ (⟨⟨f, g⟩ , ha⟩ : {i : Imp // i ∈ impR}) ↦
-                  have premise := automatedProof ⟨aL, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
-                                                  (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
-                  let xs := aL.map Form.atoms; let ys := aR.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
-                  have ruleP := impr f g xs ys block
-                  match premise with
-                  | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
-                  | .refutation rf neqE => .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩), by simpa using neqE⟩
-                ) (List.attach_ne_nil_iff.mpr h)
+                ) // l ≠ [] } :=
+                impR.attach.mapNonempty mkImpRApp (List.attach_ne_nil_iff.mpr h)
+            let ⟨impRApplications, hnotempty⟩ := imprA
 
-            --let neqE : impRApplications.filterMap Sum.getLeft? = some ys
-            match hpick : pickProof impRApplications with
+            match hpick : pickProof imprA.val with
             | .inl pf => exact Result.proof (pf.unattach |>.flatten) (by grind [unattach_flatten_notEmpty])
             | .inr rfs =>
               let choices := choices (rfs.unattach) --all dif ways to construct refutation
@@ -113,11 +120,37 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                   ∀ x ∈ impR,
                     ∃ row ∈ rfs.unattach,
                       ∀ t ∈ row, t.1 = x.f ∧ t.2.1 = x.g := by
-                have jup : ∀ x ∈ choices, ¬x = [] ∧ x.length = (rfs.unattach).length ∧
-                        ∀ i, (h : i < x.length) → (h' : i < (rfs.unattach).length) → x[i]'h ∈ (rfs.unattach)[i]'h' :=
-                  by grind
 
-                sorry
+
+                have hpick' : imprA.1 = rfs.map Sum.inr := by
+                  simpa [pickProof_eq_inr] using hpick
+                intro x hx
+                have hmem : mkImpRApp ⟨x, hx⟩ ∈ imprA.1 := by --sorry
+                  have same : imprA.1 = List.map mkImpRApp impR.attach := by
+                    rfl
+                  rw [same]
+                  refine List.mem_map.mpr ?_
+                  exact ⟨⟨x, hx⟩, by simp, rfl⟩
+                rw [hpick'] at hmem
+                cases hmk : mkImpRApp ⟨x, hx⟩ with
+                | inl pf => grind
+                | inr row =>
+                  use row.1
+                  constructor
+                  · have hrow : row ∈ rfs := by grind
+                    change row.1 ∈ List.map Subtype.val rfs
+                    exact List.mem_map.mpr ⟨row, hrow, rfl⟩
+                  · intro t ht
+                    cases x with
+                    | mk f g =>
+                      dsimp [mkImpRApp] at hmk
+                      split at hmk
+                      · cases hmk
+                      · simp at hmk
+                        rcases hmk with ⟨rfl⟩
+                        rcases List.mem_map.mp ht with ⟨u, hu, rfl⟩
+                        simp
+
 
               have ruleR := (Refutation.impr hist aL aR impR block (by grind)) --new parent to choices
               exact .refutation (choices.attach.map (λ ⟨c, h⟩ ↦
@@ -132,8 +165,8 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                                                     )
                                 ) (by simp [choices]; apply List.attach_eq_nil_iff.not.mpr; simp; apply List.unattach_ne (by grind))
         | xs@(_::_) => by
-          --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as bs) := by simp [common]
-          --have corr := findIntersCorr as bs
+          --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as aR) := by simp [common]
+          --have corr := findIntersCorr as aR
           let proofs := xs.attach.map (λ ⟨x, hx⟩ ↦
                         Proof.ax x ((aL.map Form.atoms)) ((aR.map Form.atoms) ++ (impR.map Imp.toForm)) block
                         (by grind)
@@ -211,7 +244,7 @@ termination_by s.weight cap
 decreasing_by
   all_goals
     simp_all [Seq4Proof.weight, Weight.lt_iff, Seq4Proof.r]
-    try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT]
+    try grind [= List.mem_map, -Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT]
   · left
     have hx : { f, g} ∉ hist := by
       intro hmem
