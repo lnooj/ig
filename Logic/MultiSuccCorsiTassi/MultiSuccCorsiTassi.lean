@@ -5,10 +5,6 @@ import Logic.MultiSuccCorsiTassi.Result
 import Logic.MultiSuccCorsiTassi.Termination
 import Logic.MultiSuccCorsiTassi.Helper
 
-def List.findSome {α β : Type*} (xs : List α) (p : α → Bool) (f : (a : α) → p a → β) (h : ∃ a ∈ xs, p a) : β :=
-  xs.findSome? (λ a ↦ if h' : p a then some (f a h') else none ) |>.get (by simp_all)
-
-
 
 namespace multiSucc
 open multiSucc
@@ -17,37 +13,42 @@ open multiSucc
 open Proof
 open Refutation
 
+abbrev ImpRRefut (hist block : List Imp) (as : List Atom) : Type :=
+  (a : Form) × (b : Form) ×
+    Refutation
+      { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+      ({ f := a, g := b } :: hist)
+
+abbrev ImpRRow (impR hist block : List Imp) (as : List Atom)
+    (u : {i : Imp // i ∈ impR}) : Type :=
+  { rf : List (ImpRRefut hist block as) //
+    rf ≠ [] ∧ ∀ t ∈ rf, t.1 = u.1.f ∧ t.2.1 = u.1.g }
+
 @[grind ., simp]
 theorem mem_of_mem_choices_tagged
   (impR hist block : List Imp)
   (as : List Atom)
-  (rfs : List
-    { rf :
-        List ((a : Form) × (b : Form) ×
-          Refutation
-            { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
-            ({ f := a, g := b } :: hist))
-      // rf ≠ [] })
+  (rows : List (Σ u : {i : Imp // i ∈ impR}, ImpRRow impR hist block as u))
   (hrows :
-    ∀ x ∈ impR,
-      ∃ row ∈ rfs.unattach,
-        ∀ t ∈ row, t.1 = x.f ∧ t.2.1 = x.g)
-  {c : List ((a : Form) × (b : Form) ×
-      Refutation
-        { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
-        ({ f := a, g := b } :: hist))}
+    ∀ (x : Imp) (hx : x ∈ impR),
+      ∃ rw : ImpRRow impR hist block as ⟨x, hx⟩,
+        (⟨⟨x, hx⟩, rw⟩ :
+          Σ u : {i : Imp // i ∈ impR}, ImpRRow impR hist block as u) ∈ rows)
+  {c : List (ImpRRefut hist block as)}
   {x : Imp}
   (hx : x ∈ impR)
-  (hc : c ∈ multiSucc.choices rfs.unattach) :
+  (hc : c ∈ multiSucc.choices (rows.map (fun tr => tr.2.1))) :
   ∃ r', ⟨x.f, x.g, r'⟩ ∈ c := by
-  obtain ⟨row, hrow, htags⟩ := hrows x hx
-  obtain ⟨t, htrow, htc⟩ := mem_of_mem_choices hc hrow
+  obtain ⟨row, hrow⟩ := hrows x hx
+  have hrow' : row.1 ∈ rows.map (fun tr => tr.2.1) := by
+    exact List.mem_map.mpr ⟨⟨⟨x, hx⟩, row⟩, hrow, rfl⟩
+  obtain ⟨t, htrow, htc⟩ := mem_of_mem_choices hc hrow'
   rcases t with ⟨a, b, r'⟩
-  have htag := htags ⟨a, b, r'⟩ htrow
+  have htag := row.2.2 ⟨a, b, r'⟩ htrow
   simp at htag
   rcases htag with ⟨ha, hb⟩
-  subst ha
-  subst hb
+  subst a
+  subst b
   exact ⟨r', htc⟩
 
 
@@ -88,85 +89,95 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
           --METARULE 1 NONINVERTABLE REEGEL
           else by
             simp only [Seq4Proof.toSeq, List.append_nil]
-            let mkImpRApp :
-                {i : Imp // i ∈ impR} →
-                  {pf : List (Proof ⟨↑(aL.map Form.atoms), ↑block, ↑(aR.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
-                  {rf : List ((a b : Form) × Refutation ⟨↑(a :: aL.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
-                 := (λ (u : {i : Imp // i ∈ impR}) ↦
-                  match u with
-                  | ⟨⟨f, g⟩, ha⟩ =>
-                    have premise := automatedProof ⟨aL, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
-                                                    (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
-                    let xs := aL.map Form.atoms
-                    let ys := aR.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
-                    have ruleP := impr f g xs ys block
-                    match premise with
-                    | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
-                    | .refutation rf neqE => .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩), by simpa using neqE⟩)
-            let imprA :
-            -- find either a list of proofs for any of the imps, if none found, get the function required to get ALL refutations
-                {l : List (
-                  {pf : List (Proof ⟨↑(aL.map Form.atoms), ↑block, ↑(aR.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []} ⊕
-                  {rf : List ((a b : Form) × Refutation ⟨↑(a :: aL.map Form.atoms ++ block.map Imp.toForm), {}, {b}⟩ (⟨a,b⟩ :: hist)) // rf ≠ []}
-                ) // l ≠ [] } :=
-                impR.attach.mapNonempty mkImpRApp (List.attach_ne_nil_iff.mpr h)
-            let ⟨impRApplications, hnotempty⟩ := imprA
+
+            let refut := ImpRRefut hist block aL
+
+            let proof :=
+              {pf : List (Proof ⟨↑(aL.map Form.atoms), ↑block,
+                ↑(aR.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []}
+
+            let row (u : {i : Imp // i ∈ impR}) :=
+              ImpRRow impR hist block aL u
+
+            have mkImpRApp : (u : {i : Imp // i ∈ impR}) → proof ⊕ row u
+              := λ u ↦
+                match u with
+                | ⟨⟨f, g⟩, ha⟩ =>
+                  have premise := automatedProof ⟨aL, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
+                                                  (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
+                  let xs := aL.map Form.atoms
+                  let ys := aR.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
+                  have ruleP := impr f g xs ys block
+                  match premise with
+                  | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
+                  | .refutation rf neqE =>
+                      .inr ⟨rf.map (λ p ↦ ⟨f, g, p.castSeq⟩),
+                      by simpa using neqE,
+                      by
+                        intro t ht
+                        rcases List.mem_map.mp ht with ⟨p, hp, rfl⟩
+                        simp⟩
+
+
+            let toPick (u : {i : Imp // i ∈ impR}) : proof ⊕ Σ u : {i : Imp // i ∈ impR}, row u :=
+            match mkImpRApp u with
+            | .inl pf => .inl pf
+            | .inr rw => .inr ⟨u, rw⟩
+
+            have imprA :
+                {l : List (proof ⊕  Σ u : {i : Imp // i ∈ impR}, row u) //
+                  l ≠ [] ∧ l = impR.attach.map toPick} :=
+              ⟨impR.attach.map toPick,
+                by
+                  constructor
+                  · exact (impR.attach.mapNonempty toPick (List.attach_ne_nil_iff.mpr h)).2
+                  · rfl⟩
 
             match hpick : pickProof imprA.val with
             | .inl pf => exact Result.proof (pf.unattach |>.flatten) (by grind [unattach_flatten_notEmpty])
-            | .inr rfs =>
-              let choices := choices (rfs.unattach) --all dif ways to construct refutation
+            | .inr rows =>
+              let rfs : List (List refut) := rows.map (fun tr => tr.2.1)
+              let chs := choices rfs --all dif ways to construct refutation
               have hrows :
-                  ∀ x ∈ impR,
-                    ∃ row ∈ rfs.unattach,
-                      ∀ t ∈ row, t.1 = x.f ∧ t.2.1 = x.g := by
-
-
-                have hpick' : imprA.1 = rfs.map Sum.inr := by
-                  simpa [pickProof_eq_inr] using hpick
+                  ∀ (x : Imp) (hx : x ∈ impR),
+                    ∃ rw : row ⟨x, hx⟩,
+                      (⟨⟨x, hx⟩, rw⟩ :
+                        Σ u : {i : Imp // i ∈ impR}, row u) ∈ rows := by
+                have hpick' : imprA.1 = rows.map Sum.inr := by grind
+                  --simpa [pickProof_eq_inr] using hpick
                 intro x hx
-                have hmem : mkImpRApp ⟨x, hx⟩ ∈ imprA.1 := by --sorry
-                  have same : imprA.1 = List.map mkImpRApp impR.attach := by
-                    rfl
-                  rw [same]
-                  refine List.mem_map.mpr ?_
-                  exact ⟨⟨x, hx⟩, by simp, rfl⟩
+                have hmem : toPick ⟨x, hx⟩ ∈ imprA.1 := by grind
+                  /- rw [imprA.2.2]
+                  exact List.mem_map.mpr ⟨⟨x, hx⟩, by simp, rfl⟩ -/
                 rw [hpick'] at hmem
                 cases hmk : mkImpRApp ⟨x, hx⟩ with
                 | inl pf => grind
-                | inr row =>
-                  use row.1
-                  constructor
-                  · have hrow : row ∈ rfs := by grind
-                    change row.1 ∈ List.map Subtype.val rfs
-                    exact List.mem_map.mpr ⟨row, hrow, rfl⟩
-                  · intro t ht
-                    cases x with
-                    | mk f g =>
-                      dsimp [mkImpRApp] at hmk
-                      split at hmk
-                      · cases hmk
-                      · simp at hmk
-                        rcases hmk with ⟨rfl⟩
-                        rcases List.mem_map.mp ht with ⟨u, hu, rfl⟩
-                        simp
+                | inr rw =>
+                    exact ⟨rw, by simpa [toPick, hmk] using hmem⟩
+
+              have chs_ne : chs ≠ [] := by
+                have hpick' : imprA.1 = rows.map Sum.inr := by simpa [pickProof_eq_inr] using hpick
+                have rows_ne : rows ≠ [] := by grind
+                have rfs_ne : rfs ≠ [] := by simpa [rfs] using rows_ne
+                grind
 
 
               have ruleR := (Refutation.impr hist aL aR impR block (by grind)) --new parent to choices
-              exact .refutation (choices.attach.map (λ ⟨c, h⟩ ↦
+              exact .refutation (chs.attach.map (λ ⟨c, h⟩ ↦
                                                 ruleR (λ a b hab ↦
                                                       (c.findSome (λ ⟨a', b', r'⟩ ↦ a = a' ∧ b = b') -- find the same imp in child as in parent
                                                                   (λ ⟨a', b', r'⟩ _ ↦ (r'.castSeq (hb := by grind) (hh := by grind) (hc := by grind)))
-                                                                  (by
+                                                                  ( by
                                                                     obtain ⟨r', hr'⟩ :=
-                                                                      mem_of_mem_choices_tagged impR hist block aL rfs hrows hab (by simpa using h)
+                                                                      mem_of_mem_choices_tagged impR hist block aL rows hrows hab (by simpa [chs, rfs] using h)
                                                                     exact ⟨⟨a, b, r'⟩, hr', by simp⟩ )) --prove that same imps can be found in choices as in parent
                                                       )
-                                                    )
-                                ) (by simp [choices]; apply List.attach_eq_nil_iff.not.mpr; simp; apply List.unattach_ne (by grind))
+                                                )
+                                ) (by
+                                  intro hnil
+                                  have : chs.attach = [] := List.map_eq_nil_iff.mp hnil
+                                  exact (List.attach_ne_nil_iff.mpr chs_ne) this)
         | xs@(_::_) => by
-          --have Γ : ∀ x ∈ xs, x ∈ (findIntersection as aR) := by simp [common]
-          --have corr := findIntersCorr as aR
           let proofs := xs.attach.map (λ ⟨x, hx⟩ ↦
                         Proof.ax x ((aL.map Form.atoms)) ((aR.map Form.atoms) ++ (impR.map Imp.toForm)) block
                         (by grind)
@@ -179,16 +190,13 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
 
       | ⊥ :: succForms =>   --botr rule, .bot is ignored
         have premise := automatedProof ⟨aL, [], block, aR, succForms, impR, hist⟩ cap
-        --simp only [Seq4Proof.toSeq, List.append_nil] at premise ⊢
         let ys := (aR.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
         have ruleP := Proof.botr (aL.map .atoms) ys block; have ruleR := Refutation.botr hist (aL.map .atoms) ys block
-        --simp [xs, ys] at ruleP ruleR
         (premise.castSeq.map hist ruleP ruleR).castSeq
 
       | (.and a b) :: succForms =>
         have premise₁ := automatedProof ⟨aL, [], block, aR, a :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
         have premise₂ := automatedProof ⟨aL, [], block, aR, b :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-        --simp [Seq4Proof.toSeq] at premise₁ premise₂ ⊢
         let ys := (aR.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
         have ruleP := andr a b (aL.map .atoms) ys block;
         have ruleR₁ := andr₁ hist a b (aL.map .atoms) ys block; have ruleR₂ := andr₂ hist a b (aL.map .atoms) ys block
@@ -244,7 +252,7 @@ termination_by s.weight cap
 decreasing_by
   all_goals
     simp_all [Seq4Proof.weight, Weight.lt_iff, Seq4Proof.r]
-    try grind [= List.mem_map, -Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT]
+    try grind [Seq4Proof.weight, Weight.instWellFoundedRelation, Weight.instLT]
   · left
     have hx : { f, g} ∉ hist := by
       intro hmem
@@ -273,7 +281,6 @@ decreasing_by
       grind
     simp_all
     grind
-
 
 def automatedProofHelper (s : Sequent) : Std.Format :=
   have res := automatedProof s.toSeq4 s.toSeq4.cap.card (by simp) (by simp [Sequent.toSeq4])

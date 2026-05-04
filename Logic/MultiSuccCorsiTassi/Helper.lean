@@ -6,7 +6,8 @@ import Mathlib.Data.List.ProdSigma
 import Logic.MultiSuccCorsiTassi.Core
 import Logic.MultiSuccCorsiTassi.Refutation
 
-
+def List.findSome {α β : Type*} (xs : List α) (p : α → Bool) (f : (a : α) → p a → β) (h : ∃ a ∈ xs, p a) : β :=
+  xs.findSome? (λ a ↦ if h' : p a then some (f a h') else none ) |>.get (by simp_all)
 
 def List.mapNonempty {α β : Type*} (f : α → β) (xs : List α) (h : xs ≠ []) : {ys : List β // ys ≠ []} :=
   ⟨xs.map f, by simp [h]⟩
