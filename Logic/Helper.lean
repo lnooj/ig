@@ -3,8 +3,8 @@ import Mathlib.Algebra.BigOperators.Ring.List
 import Mathlib.Algebra.GroupWithZero.Nat
 import Mathlib.Data.List.ProdSigma
 
-import Logic.MultiSuccCorsiTassi.Core
-import Logic.MultiSuccCorsiTassi.Refutation
+import Logic.Core
+import Logic.RIG
 
 def List.findSome {α β : Type*} (xs : List α) (p : α → Bool) (f : (a : α) → p a → β) (h : ∃ a ∈ xs, p a) : β :=
   xs.findSome? (λ a ↦ if h' : p a then some (f a h') else none ) |>.get (by simp_all)
@@ -131,7 +131,7 @@ theorem List.findSome?_ne_none_of_mem {xs : List α} {f : α → Option β} {x :
 theorem Subtype.prop_map
 (rfs : List { rf : List ((a : Form) ×
           (b : Form) ×
-            Refutation { Γ := ↑(a :: List.map Form.atom as ++ List.map Imp.toForm block), Θ := ∅, Δ := {b} }
+            RIG { Γ := ↑(a :: List.map Form.atom as ++ List.map Imp.toForm block), Θ := ∅, Δ := {b} }
               ({ f := a, g := b } :: hist)) // rf ≠ [] }) : [] ∉ rfs.unattach := by
   simp_all only [ne_eq, List.mem_unattach, not_true_eq_false, IsEmpty.exists_iff, not_false_eq_true]
 

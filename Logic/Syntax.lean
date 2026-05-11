@@ -1,7 +1,7 @@
 import Lean.PrettyPrinter.Delaborator
 import Mathlib.Data.Multiset.Basic
 
-import Logic.MultiSuccCorsiTassi.Core
+import Logic.Core
 
 open multiSucc
 

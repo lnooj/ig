@@ -1,12 +1,12 @@
-import Logic.MultiSuccCorsiTassi.Refutation
-import Logic.MultiSuccCorsiTassi.Kripke
+import Logic.RIG
+import Logic.Kripke
 
 namespace multiSucc
 open multiSucc
 
 
 @[simp, grind]
-def Refutation.getCM (ref : Refutation s h) :  Model :=
+def RIG.getCM (ref : RIG s h) :  Kripke :=
 match ref with
 | ax hs as bs bl pf => ⟨⟨as.toFinset, bs.toFinset⟩, []⟩
 | botr hs xs ys bl prem
@@ -20,48 +20,48 @@ match ref with
 | impl₂ hs a b xs ys bl prem
 | afort hs a b xs ys bl pf prem => prem.getCM
 | impr hs as bs ys bl pf prem =>
-  let children : List Model := ys.attach.map (λ ⟨⟨a, b⟩, yh⟩ ↦ (prem a b yh).getCM)
-  let cUn := Models.getRejected children
+  let children : List Kripke := ys.attach.map (λ ⟨⟨a, b⟩, yh⟩ ↦ (prem a b yh).getCM)
+  let cUn := Kripkes.getRejected children
   ⟨⟨as.toFinset, bs.toFinset ∪ cUn⟩, children⟩
   -- add children.rejected to bs. this is necessary bc without it you can't prove ref.getCM.wf. goal would be b ∈ bs which is not true
 
 
 @[simp, grind .]
-theorem Refutation.ant_atom_forced (r : Refutation s h)
+theorem RIG.ant_atom_forced (r : RIG s h)
   (ha : Form.atom a ∈ s.Γ) : a ∈ r.getCM.world.forced := by
   induction r generalizing a <;> simp_all
 
 @[simp, grind .]
-theorem Refutation.ant_atom_rejected (r : Refutation s h)
+theorem RIG.ant_atom_rejected (r : RIG s h)
   (ha : Form.atom a ∈ s.Δ) : a ∈ r.getCM.world.rejected := by
   induction r generalizing a <;> simp_all
 
-/- def Result.getCMs (r : Result s b h) : List Model :=
+/- def Result.getCMs (r : Result s b h) : List Kripke :=
 match r with
-| refutation rfs _ => rfs.map (λ rf ↦ Refutation.getCM rf )
+| refutation rfs _ => rfs.map (λ rf ↦ RIG.getCM rf )
 | _ => [] -/
 
 --@[simp, grind =]
-theorem Refutation.cm_wf (r : Refutation s h) : r.getCM.wf := by
-  induction r <;> try (rw [Refutation.getCM]; assumption)
-  . rw [Refutation.getCM, Model.wf]; simp
-  . rename_i hs as bs ys bl i prem ih; simp_all; rw [Model.wf]; simp;
+theorem RIG.cm_wf (r : RIG s h) : r.getCM.wf := by
+  induction r <;> try (rw [RIG.getCM]; assumption)
+  . rw [RIG.getCM, Kripke.wf]; simp
+  . rename_i hs as bs ys bl i prem ih; simp_all; rw [Kripke.wf]; simp;
     intro m imp imp_in imp_m; let ⟨f,g⟩ := imp; subst_eqs; simp_all
     specialize ih f g imp_in; --specialize prem f g imp_in
     split_ands
     . intro a ha
       have ha_forced : a ∈ (prem f g imp_in).getCM.world.forced := by
-          apply Refutation.ant_atom_forced (prem f g imp_in)
+          apply RIG.ant_atom_forced (prem f g imp_in)
           simp_all
       exact ha_forced
     . intro b hb
-      suffices mm : b ∈ Models.getRejected (ys.attach.map (fun ⟨⟨a, b⟩, h⟩ => (prem a b h).getCM)) by simp_all
+      suffices mm : b ∈ Kripkes.getRejected (ys.attach.map (fun ⟨⟨a, b⟩, h⟩ => (prem a b h).getCM)) by simp_all
       have hmem : b ∈ (prem f g imp_in).getCM.world.rejected := by grind
-      apply Models.getRejected_elem (by grind) b hmem
+      apply Kripkes.getRejected_elem (by grind) b hmem
 
 
 /- TODO: problem with proving that all left imp sides in hist list evaluate to true -/
-theorem Refutation.completeness (s : Sequent) ( r : Refutation s h) :
+theorem RIG.completeness (s : Sequent) ( r : RIG s h) :
   /- (i : (evalAnt s.Γ r.getCM ∧ h.eval r.getCM ) = TV.t) -/
       s.evalR h r.getCM = TV.f := by
   have wf := r.cm_wf
@@ -84,7 +84,7 @@ theorem Refutation.completeness (s : Sequent) ( r : Refutation s h) :
   | orl₂ => simp_all
   | orr => simp_all
   | impr hs as bs ys bl i prem ih =>
-    simp_all; rw [Model.wf] at wf; simp_all
+    simp_all; rw [Kripke.wf] at wf; simp_all
     constructor
     . constructor
       . intro x ih; rw [Form.eval]; simp_all
@@ -107,7 +107,7 @@ theorem Refutation.completeness (s : Sequent) ( r : Refutation s h) :
     rcases ih with ⟨h₁, h₂, h₃⟩
     rw [eval_imp_false_iff]; simp_all; left
     sorry
-    --have a_in_xs := Refutation.afort_corr pf prem
+    --have a_in_xs := RIG.afort_corr pf prem
     --grind
 
 end multiSucc

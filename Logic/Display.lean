@@ -2,10 +2,10 @@ import Mathlib.Data.Multiset.Sort
 import Mathlib.Data.List.Lex
 import Mathlib.Data.Finset.Sort
 
-import Logic.MultiSuccCorsiTassi.Syntax
-import Logic.MultiSuccCorsiTassi.Kripke
-import Logic.MultiSuccCorsiTassi.Proof
-import Logic.MultiSuccCorsiTassi.Refutation
+import Logic.Syntax
+import Logic.Kripke
+import Logic.IG
+import Logic.RIG
 
 namespace multiSucc
 open multiSucc
@@ -37,14 +37,14 @@ instance : ToString World where
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
 
-def mToString : Model → String
+def mToString : Kripke → String
 | ⟨w, []⟩ => toString w
 | ⟨w, bs⟩ =>
   let bstrs := bs.map mToString
   toString w ++ "\n " ++ indent 0 (String.intercalate "  |  " bstrs)
 
 
-instance : ToString Model where
+instance : ToString Kripke where
   toString m := mToString m
 
 instance : ToString TV where
@@ -66,11 +66,11 @@ def listToStringB (xs : List Imp) : String :=
 
 def Γ.ToString (xs : List Form) (bl : List Imp) : String := s!"{listToString xs}, {listToStringB bl}"
 
-def listModelToString (ms : List Model) : String := String.intercalate "\n \n" (ms.map mToString)
+def listKripkeToString (ms : List Kripke) : String := String.intercalate "\n \n" (ms.map mToString)
 
-/-! # Proof display -/
+/-! # IG display -/
 
-def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String
+def proofToString  {xseq : Sequent} (indentLvl : Nat) : IG xseq → String
 | .ax _ xs ys bl _ _=>
   indent indentLvl s!"AX: {Γ.ToString xs bl} ⊢ {listToString ys}"
 | .botl xs ys bl =>
@@ -112,18 +112,18 @@ def proofToString  {xseq : Sequent} (indentLvl : Nat) : Proof xseq → String
   let ruleLine := s!"→AF: {Γ.ToString xs bl} ⊢ {a} → {b}, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 
-def listProofToString : List (Proof xseq) → String
+def listProofToString : List (IG xseq) → String
 | [] => ""
 | x::xs => (proofToString 0 x).replace " ," "" ++ "\n \n" ++ listProofToString xs
 
-instance : ToString (List (Proof xseq)) where
+instance : ToString (List (IG xseq)) where
   toString proof := listProofToString proof
 
 
 
-/-! # Refutation display -/
+/-! # RIG display -/
 
-def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refutation xseq h → String
+def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : RIG xseq h → String
 | .ax h as bs bl _ =>
   indent indentLvl s!"AX: {listToString (as.map Form.atom) ++ listToStringB bl} , ⊬ {listToString (bs.map Form.atom)}"
 | .botr h xs ys bl proof =>
@@ -175,12 +175,12 @@ def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refu
   let ruleLine := s!"→AF: {Γ.ToString xs bl} ⊬ {a} ⊃ {b}, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 
-def listRefutationToString : List (Refutation xseq h) → String
+def listRefutationToString : List (RIG xseq h) → String
 | [] => ""
 | x::xs => (refutationToString 0 x).replace " ," "" ++ "\n \n" ++ listRefutationToString xs
 
 
-instance : ToString (List (Refutation xseq h)) where
+instance : ToString (List (RIG xseq h)) where
   toString proof := listRefutationToString proof
 
 end multiSucc

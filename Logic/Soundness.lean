@@ -1,17 +1,17 @@
-import Logic.MultiSuccCorsiTassi.Core
---import Logic.MultiSuccCorsiTassi.Syntax
-import Logic.MultiSuccCorsiTassi.Helper
---import Logic.MultiSuccCorsiTassi.Display
-import Logic.MultiSuccCorsiTassi.Kripke
---import Logic.MultiSuccCorsiTassi.MultiSuccCorsiTassi
-import Logic.MultiSuccCorsiTassi.Proof
+import Logic.Core
+--import Logic.Syntax
+import Logic.Helper
+--import Logic.Display
+import Logic.Kripke
+--import Logic.MultiSuccCorsiTassi
+import Logic.IG
 
 namespace multiSucc
 open multiSucc
 
 
-theorem Proof.soundness (s : Sequent) (p : Proof s) :
-  ∀ (m : Model), m.wf → s.evalP m ≠ TV.f := by
+theorem IG.soundness (s : Sequent) (p : IG s) :
+  ∀ (m : Kripke), m.wf → s.evalP m ≠ TV.f := by
   intro m wf
   induction p generalizing m with
   | ax x xs ys bl hxs hys =>
@@ -67,9 +67,9 @@ theorem Proof.soundness (s : Sequent) (p : Proof s) :
     . use m'
       simp_all
       constructor
-      . grind only [Model.all_wf]
+      . grind only [Kripke.all_wf]
       . intro x h; specialize h₁ x  h
-        grind [Model.mono_all_true]
+        grind [Kripke.mono_all_true]
 
   | impl a b xs ys bl prem1 prem2 ih₁ ih₂ =>
     simp
@@ -88,5 +88,5 @@ theorem Proof.soundness (s : Sequent) (p : Proof s) :
     apply_assumption
     apply imp_false_then_b_false h₂ wf
 
-#print axioms Proof.soundness
+#print axioms IG.soundness
 end multiSucc

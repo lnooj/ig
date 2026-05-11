@@ -1,5 +1,5 @@
 
-import Logic.MultiSuccCorsiTassi.Termination
+import Logic.Termination
 
 namespace multiSucc
 open multiSucc
@@ -11,13 +11,13 @@ structure World where
 
 deriving DecidableEq
 
-structure Model where
+structure Kripke where
   world : World
-  branch : List Model
+  branch : List Kripke
 deriving BEq
 
 --@[grind, simp]
-def Model.wf (m : Model) : Bool :=
+def Kripke.wf (m : Kripke) : Bool :=
 ∀ fm ∈ m.branch.attach,
   fm.val.wf ∧
   m.world.forced ⊆ fm.val.world.forced ∧
@@ -25,64 +25,64 @@ def Model.wf (m : Model) : Bool :=
   --Disjoint m.world.forced m.world.rejected
 decreasing_by
 all_goals
-  have : sizeOf m.branch < sizeOf m := by grind [Model]
+  have : sizeOf m.branch < sizeOf m := by grind [Kripke]
   apply lt_trans _ this
   apply List.sizeOf_lt_of_mem
   grind
 
 @[grind, simp]
-def Models.getRejected : List Model → Finset Atom
+def Kripkes.getRejected : List Kripke → Finset Atom
 | [] => {}
-| x :: xs => x.world.rejected ∪ Models.getRejected xs
+| x :: xs => x.world.rejected ∪ Kripkes.getRejected xs
 
 @[grind ., simp]
-theorem Models.getRejected_elem {ms : List Model} (mem: m ∈ ms):
-  ∀ a ∈ m.world.rejected, a ∈ Models.getRejected ms := by
+theorem Kripkes.getRejected_elem {ms : List Kripke} (mem: m ∈ ms):
+  ∀ a ∈ m.world.rejected, a ∈ Kripkes.getRejected ms := by
   intro a ah; fun_induction getRejected <;> grind
 
-def Model.depth : Model → Nat
+def Kripke.depth : Kripke → Nat
 | ⟨_, branch⟩ =>
-  1 + (branch.map Model.depth).max?.getD 0
+  1 + (branch.map Kripke.depth).max?.getD 0
 
-theorem Model.depth_eq {m : Model} : m.depth = 1 + (m.branch.map Model.depth).max?.getD 0 := by
+theorem Kripke.depth_eq {m : Kripke} : m.depth = 1 + (m.branch.map Kripke.depth).max?.getD 0 := by
   cases m
   simp [depth]
 
-lemma depth_lt_of_mem {m' m : Model} :
+lemma depth_lt_of_mem {m' m : Kripke} :
   m' ∈ m.branch → m'.depth < m.depth := by
   intro hmem
-  simp [Model.depth_eq]
-  have : m'.depth ∈ List.map Model.depth m.branch := by grind
+  simp [Kripke.depth_eq]
+  have : m'.depth ∈ List.map Kripke.depth m.branch := by grind
   have := List.le_max?_getD_of_mem this (k:=0)
-  simp [Model.depth_eq] at this
+  simp [Kripke.depth_eq] at this
   omega
 
 --@[grind, simp]
-def Model.all (m : Model) : List Model :=
+def Kripke.all (m : Kripke) : List Kripke :=
   m :: m.branch.attach.flatMap (all ·.val)
 decreasing_by
-  have : sizeOf m.branch < sizeOf m := by grind [Model]
+  have : sizeOf m.branch < sizeOf m := by grind [Kripke]
   apply lt_trans _ this
   apply List.sizeOf_lt_of_mem
   grind
 
 
 @[grind ., simp]
-theorem Model.all_nested_in_all {m m' a : Model} (h₁ : a ∈ m.branch) (h₂ : m' ∈ a.all) : m' ∈ m.all := by
-  fun_induction Model.all m with
+theorem Kripke.all_nested_in_all {m m' a : Kripke} (h₁ : a ∈ m.branch) (h₂ : m' ∈ a.all) : m' ∈ m.all := by
+  fun_induction Kripke.all m with
   | case1 m ih => simp_all; right; grind
 
 @[grind ., simp]
-theorem Model.branch_wf {m m' : Model} (wf : m.wf) (mem : m' ∈ m.branch) : m'.wf := by rw [Model.wf] at wf; simp_all
+theorem Kripke.branch_wf {m m' : Kripke} (wf : m.wf) (mem : m' ∈ m.branch) : m'.wf := by rw [Kripke.wf] at wf; simp_all
 
 @[grind ., simp]
-theorem Model.all_wf {m m' : Model} (wf : m.wf) (mem : m' ∈ m.all) : m'.wf := by
-  fun_induction Model.all with
+theorem Kripke.all_wf {m m' : Kripke} (wf : m.wf) (mem : m' ∈ m.all) : m'.wf := by
+  fun_induction Kripke.all with
   | case1 m ih =>
     simp_all
     rcases mem with h | ⟨a, h₁, h₂⟩
     . grind
-    . rw [Model.wf] at wf
+    . rw [Kripke.wf] at wf
       simp_all
       apply ih a h₁ h₂
 
@@ -152,7 +152,7 @@ assoc a b c := by cases a <;> cases b <;> cases c <;> rfl
 
 /-! # Main evaluation function -/
 @[grind]
-def Form.eval : Form → Model → TV
+def Form.eval : Form → Kripke → TV
 | .atom a, m =>
       if a ∈ m.world.forced then .t
       else if a ∈ m.world.rejected then .f
@@ -170,7 +170,7 @@ termination_by fm m => (Form.complexity fm, m.depth)
 decreasing_by
 all_goals first | (apply Prod.Lex.left; grind) | (apply Prod.Lex.right; apply depth_lt_of_mem; grind)
 
-/- def Form.evalHist : Form → List Imp → Model → TV
+/- def Form.evalHist : Form → List Imp → Kripke → TV
 | .imp a b, h, m =>
     if ⟨a, b⟩ ∈ h ∧ b.eval m = .f then .f
     else
@@ -205,45 +205,45 @@ theorem evalHist_and : (a ∧∧ b).evalHist h m = (a ∧∧ b).eval m := by rfl
 theorem evalHist_or : (Form.or a b).evalHist h m = (Form.or a b).eval m := by rfl -/
 
 
-def evalBlocked : Imp → Model → TV
+def evalBlocked : Imp → Kripke → TV
 | {f, g}, m =>
   if (m.branch.attach.all (λ m' => (f ⊃ g).eval m'.val = .t)) then .t
   else if (m.branch.attach.any (λ m' => (f ⊃ g).eval m'.val = .f)) then .f
   else .u
 
 
-def evalAnt (Γ : Multiset Form) (m : Model) : TV :=
+def evalAnt (Γ : Multiset Form) (m : Kripke) : TV :=
   (Γ.map (fun f => f.eval m)).fold conjTV TV.t
 scoped notation "⋀ " m:max ", " Γ:max => evalAnt Γ m
 
 /-
-def evalAntH (Γ : Multiset Form) (h : List Imp) (m : Model) : TV :=
+def evalAntH (Γ : Multiset Form) (h : List Imp) (m : Kripke) : TV :=
   (Γ.map (fun f => f.evalHist h m)).fold conjTV TV.t
 scoped notation "⋀ₕ " h:max "," m:max ", " Γ:max => evalAntH Γ h m -/
 
-def evalAntB (Γ : Multiset Imp) (m : Model) : TV :=
+def evalAntB (Γ : Multiset Imp) (m : Kripke) : TV :=
   (Γ.map (fun f => evalBlocked f m)).fold conjTV TV.t
 scoped notation "⋀* " m:max ", " Γ:max => evalAntB Γ m
 
 @[simp]
 theorem evalAntB0 : ⋀* m, 0 = TV.t := by simp [evalAntB]
 
-def evalSucc (Δ : Multiset Form) (m : Model) : TV :=
+def evalSucc (Δ : Multiset Form) (m : Kripke) : TV :=
   (Δ.map (fun f => f.eval m)).fold disjTV TV.f
 scoped notation "⋁ " m:max ", " Γ:max => evalSucc Γ m
 
-/- def evalSuccH (Δ : Multiset Form) (h : List Imp) (m : Model) : TV :=
+/- def evalSuccH (Δ : Multiset Form) (h : List Imp) (m : Kripke) : TV :=
   (Δ.map (fun f => f.evalHist h m)).fold disjTV TV.f
 scoped notation "⋁ₕ " h:max "," m:max ", " Γ:max => evalSuccH Γ h m -/
 
 @[simp, grind]
-def Sequent.evalΓ : Sequent  → Model → TV
+def Sequent.evalΓ : Sequent  → Kripke → TV
 | ⟨Γ, Θ, _ ⟩,  m => conjTV (evalAnt Γ m) (evalAntB Θ m)
 
 -- A sequent is refutable iff all its assumptions are satisfied (all forms in Γ are true) but none of the conclusions are (all Δ are false)
 
 @[grind]
-def Sequent.evalP : Sequent → Model → TV
+def Sequent.evalP : Sequent → Kripke → TV
 | s,  m =>
   match evalAnt s.ant m, evalSucc s.Δ m with
   | .t, .f => .f
@@ -251,7 +251,7 @@ def Sequent.evalP : Sequent → Model → TV
   | _, _ => .u
 
 @[grind]
-def Sequent.evalR : Sequent → List Imp → Model → TV
+def Sequent.evalR : Sequent → List Imp → Kripke → TV
 | s, h, m =>
   match s.evalΓ m, evalSucc s.Δ m with
   | .t, .f => .f
@@ -415,7 +415,7 @@ theorem eval_imp_righ_wo_ys_t :
 theorem eval_imp_false_contradict :
   (a ⊃ b).eval m = TV.f → ∃ m' ∈ m.all, a.eval m' = .t ∧ b.eval m' = .f := by
   intro impF
-  fun_induction Model.all with
+  fun_induction Kripke.all with
   | case1 m ih =>
     rw [eval_imp_false_iff] at impF
     rcases impF with impF | ⟨m', impF⟩
@@ -426,7 +426,7 @@ theorem eval_imp_false_contradict :
       grind
 
 @[grind ., simp]
-theorem evalBlocked_imp_true_then {m m': Model}
+theorem evalBlocked_imp_true_then {m m': Kripke}
   (child : m' ∈ m.branch)
   (h : evalBlocked x m = TV.t) : (x.f ⊃ x.g).eval m' = TV.t := by
   simp_all [evalBlocked_true_iff]
@@ -439,13 +439,13 @@ theorem mmmmm {bl : List Imp} :
 
 /-! # Truth monotonicity -/
 @[grind ., simp]
-theorem Model.momo_branch_true {f : Form} {m m' : Model}
+theorem Kripke.momo_branch_true {f : Form} {m m' : Kripke}
   (wf : m.wf) (mem : m' ∈ m.branch) (ftv : f.eval m = TV.t) :
     f.eval m' = TV.t := by
   have h : ∀ a ∈ m.branch, a.wf = true ∧
         m.world.forced ⊆ a.world.forced ∧
         a.world.rejected ⊆ m.world.rejected := by
-      unfold Model.wf at wf; simp at wf; exact wf
+      unfold Kripke.wf at wf; simp at wf; exact wf
   specialize h m' mem
   obtain ⟨mf', fo, unfo⟩ := h
   match f with
@@ -455,53 +455,53 @@ theorem Model.momo_branch_true {f : Form} {m m' : Model}
     simp_all
     constructor
     . obtain ⟨atv, btv⟩ := ftv
-      apply Model.momo_branch_true wf mem
+      apply Kripke.momo_branch_true wf mem
       exact atv
     . obtain ⟨atv, btv⟩ := ftv
-      apply Model.momo_branch_true wf mem
+      apply Kripke.momo_branch_true wf mem
       exact btv
   | .or a b =>
     simp_all
     cases ftv with
     | inl h =>
       left
-      apply Model.momo_branch_true wf mem
+      apply Kripke.momo_branch_true wf mem
       exact h
     | inr h =>
       right
-      apply Model.momo_branch_true wf mem
+      apply Kripke.momo_branch_true wf mem
       exact h
   | .imp a b =>
     rw [eval_imp_true_iff] at ftv
     obtain ⟨h₁, h₂⟩ := ftv
     grind
 
-theorem Model.mono_all_true {f : Form} {m m' : Model}
+theorem Kripke.mono_all_true {f : Form} {m m' : Kripke}
   (wf : m.wf) (mem : m' ∈ m.all) (ftv : f.eval m = TV.t) :
   f.eval m' = TV.t := by
-  rw [Model.all] at mem
-  --rw [Model.wf] at wf
+  rw [Kripke.all] at mem
+  --rw [Kripke.wf] at wf
   simp_all
   rcases mem with h | ⟨a, h₁, h₂⟩
   . grind
-  . have wf' : m'.wf = true := Model.all_wf wf (by grind)
-    have aT := Model.momo_branch_true wf h₁ ftv
+  . have wf' : m'.wf = true := Kripke.all_wf wf (by grind)
+    have aT := Kripke.momo_branch_true wf h₁ ftv
     have awf : a.wf := by
-      rw [Model.wf] at wf; simp at wf
+      rw [Kripke.wf] at wf; simp at wf
       grind
-    apply Model.mono_all_true awf h₂ aT
+    apply Kripke.mono_all_true awf h₂ aT
 termination_by (m.depth)
 decreasing_by exact depth_lt_of_mem h₁
 
 /-! # Falsity monotonicity proof -/
 @[grind ., simp]
-theorem Model.mono_branch_false {f : Form} {m m' : Model}
+theorem Kripke.mono_branch_false {f : Form} {m m' : Kripke}
   (wf : m.wf) (mem : m' ∈ m.branch ) (ftv : f.eval m' = .f) :
   f.eval m = .f  := by
   have h : ∀ a ∈ m.branch, a.wf = true ∧
         m.world.forced ⊆ a.world.forced ∧
         a.world.rejected ⊆ m.world.rejected := by
-      unfold Model.wf at wf; simp at wf; exact wf
+      unfold Kripke.wf at wf; simp at wf; exact wf
   specialize h m' mem
   obtain ⟨mf', fo, unfo⟩ := h
   match f with
@@ -513,20 +513,20 @@ theorem Model.mono_branch_false {f : Form} {m m' : Model}
     cases ftv with
     | inl h =>
       left
-      apply Model.mono_branch_false wf mem
+      apply Kripke.mono_branch_false wf mem
       exact h
     | inr h =>
       right
-      apply Model.mono_branch_false wf mem
+      apply Kripke.mono_branch_false wf mem
       exact h
   | .or a b =>
     simp_all
     constructor
     . obtain ⟨atv, btv⟩ := ftv
-      apply Model.mono_branch_false wf mem
+      apply Kripke.mono_branch_false wf mem
       exact atv
     . obtain ⟨atv, btv⟩ := ftv
-      apply Model.mono_branch_false wf mem
+      apply Kripke.mono_branch_false wf mem
       exact btv
   | .imp a b =>
     rw [eval_imp_false_iff]
@@ -534,16 +534,16 @@ theorem Model.mono_branch_false {f : Form} {m m' : Model}
     use m'
 
 
-theorem imp_false_branch {a b : Form} {m m' : Model}
+theorem imp_false_branch {a b : Form} {m m' : Kripke}
 (mem : m' ∈ m.branch) (h : (a ⊃ b).eval m' = TV.f) (wf : m.wf) :
 b.eval m = TV.f := by
   rw [eval_imp_false_iff] at h
   rcases h with ⟨atv, btv⟩ | h
-  . exact Model.mono_branch_false wf mem btv
+  . exact Kripke.mono_branch_false wf mem btv
   . obtain ⟨x, xmem, h⟩ := h
-    have mwf : m'.wf = true := by rw [Model.wf] at wf; simp at wf; grind
+    have mwf : m'.wf = true := by rw [Kripke.wf] at wf; simp at wf; grind
     have := imp_false_branch xmem h mwf
-    exact Model.mono_branch_false wf mem this
+    exact Kripke.mono_branch_false wf mem this
 termination_by (m.depth)
 decreasing_by exact depth_lt_of_mem mem
 
@@ -562,8 +562,8 @@ theorem b_true_then_imp_true_branch {a b : Form} (wf : m.wf) (bT : b.eval m = TV
   constructor
   . simp_all
   . simp; intro m' mh'
-    have b_fut := Model.momo_branch_true wf mh' bT
-    have m'_wf : m'.wf := by rw [Model.wf] at wf; simp_all
+    have b_fut := Kripke.momo_branch_true wf mh' bT
+    have m'_wf : m'.wf := by rw [Kripke.wf] at wf; simp_all
     apply  b_true_then_imp_true_branch m'_wf b_fut
 termination_by (m.depth)
 decreasing_by exact depth_lt_of_mem mh'

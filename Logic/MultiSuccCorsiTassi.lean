@@ -1,21 +1,21 @@
 import Mathlib.Data.Nat.Cast.Order.Ring
 
-import Logic.MultiSuccCorsiTassi.Display
-import Logic.MultiSuccCorsiTassi.Result
-import Logic.MultiSuccCorsiTassi.Termination
-import Logic.MultiSuccCorsiTassi.Helper
+import Logic.Display
+import Logic.Result
+import Logic.Termination
+import Logic.Helper
 
 
 namespace multiSucc
 open multiSucc
 
 --deriving Repr
-open Proof
-open Refutation
+open IG
+open RIG
 
 abbrev ImpRRefut (hist block : List Imp) (as : List Atom) : Type :=
   (a : Form) × (b : Form) ×
-    Refutation
+    RIG
       { Γ := ↑(a :: List.map Form.atom as ++ List.map Imp.toForm block), Θ := ∅, Δ := {b} }
       ({ f := a, g := b } :: hist)
 
@@ -93,7 +93,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
             let refut := ImpRRefut hist block aL
 
             let proof :=
-              {pf : List (Proof ⟨↑(aL.map Form.atom), ↑block,
+              {pf : List (IG ⟨↑(aL.map Form.atom), ↑block,
                 ↑(aR.map Form.atom ++ impR.map Imp.toForm)⟩) // pf ≠ []}
 
             let row (u : {i : Imp // i ∈ impR}) :=
@@ -162,7 +162,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                 grind
 
 
-              have ruleR := (Refutation.impr hist aL aR impR block (by grind)) --new parent to choices
+              have ruleR := (RIG.impr hist aL aR impR block (by grind)) --new parent to choices
               exact .refutation (chs.attach.map (λ ⟨c, h⟩ ↦
                                                 ruleR (λ a b hab ↦
                                                       (c.findSome (λ ⟨a', b', r'⟩ ↦ a = a' ∧ b = b') -- find the same imp in child as in parent
@@ -179,7 +179,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                                   exact (List.attach_ne_nil_iff.mpr chs_ne) this)
         | xs@(_::_) => by
           let proofs := xs.attach.map (λ ⟨x, hx⟩ ↦
-                        Proof.ax x ((aL.map Form.atom)) ((aR.map Form.atom) ++ (impR.map Imp.toForm)) block
+                        IG.ax x ((aL.map Form.atom)) ((aR.map Form.atom) ++ (impR.map Imp.toForm)) block
                         (by grind)
                         (by grind))
           simp only [Seq4Proof.toSeq, List.append_nil]; exact Result.proof proofs (by grind)
@@ -191,7 +191,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
       | ⊥ :: succForms =>   --botr rule, .bot is ignored
         have premise := automatedProof ⟨aL, [], block, aR, succForms, impR, hist⟩ cap
         let ys := (aR.map .atom) ++ succForms ++ (impR.map Imp.toForm)
-        have ruleP := Proof.botr (aL.map .atom) ys block; have ruleR := Refutation.botr hist (aL.map .atom) ys block
+        have ruleP := IG.botr (aL.map .atom) ys block; have ruleR := RIG.botr hist (aL.map .atom) ys block
         (premise.castSeq.map hist ruleP ruleR).castSeq
 
       | (.and a b) :: succForms =>
@@ -225,12 +225,12 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
     | .bot :: antForms => by
       let rule := [botl (aL.map .atom ++ antForms) ((aR.map .atom) ++ fR ++ (impR.map Imp.toForm)) block]
       simp only [Seq4Proof.toSeq]
-      exact .proof (Proof.castSeqList rule) (by grind)
+      exact .proof (IG.castSeqList rule) (by grind)
 
     | (.and a b) :: antForms =>
       have premise := automatedProof ⟨aL, a :: b :: antForms, block, aR, fR, impR, hist⟩ cap
       let xs := (aL.map .atom) ++ antForms; let ys := (aR.map .atom) ++ fR ++ (impR.map Imp.toForm)
-      have ruleP := andl a b xs ys block; have ruleR := Refutation.andl hist a b xs ys block
+      have ruleP := andl a b xs ys block; have ruleR := RIG.andl hist a b xs ys block
       (premise.castSeq.map hist ruleP ruleR).castSeq
 
     | (.or a b) :: antForms =>
