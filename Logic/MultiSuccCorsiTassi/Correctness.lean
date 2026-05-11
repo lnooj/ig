@@ -10,10 +10,10 @@ namespace multiSucc
 open multiSucc
 
 
-theorem proof_correctness :
-  ∀ (s : Sequent) (_ : Proof s) (m : Model) (_ : m.wf), s.evalP m ≠ TV.f := by
-  intro s pf m wf
-  induction pf generalizing m with
+theorem Proof.soundness (s : Sequent) (p : Proof s) :
+  ∀ (m : Model), m.wf → s.evalP m ≠ TV.f := by
+  intro m wf
+  induction p generalizing m with
   | ax x xs ys bl hxs hys =>
     simp
     --have hxsM : Form.atoms x ∈ (↑xs : Multiset Form) := by simpa
@@ -21,9 +21,9 @@ theorem proof_correctness :
     else if xtv' : x ∈ m.world.rejected then grind
     else grind
   | botl xs ys bl =>
-    have hAnt : evalAnt ({ Γa := ↑(⊥ :: xs), Γb := ↑bl, Δ := ↑ys } : Sequent).Γ m = TV.f := by
+    have hAnt : evalAnt ({ Γ := ↑(⊥ :: xs), Θ := ↑bl, Δ := ↑ys } : Sequent).ant m = TV.f := by
       apply evalAnt_false (f := ⊥)
-      · simp [Sequent.Γ]
+      · simp
       · simp
     grind
   | botr xs ys prem => simp_all
@@ -88,77 +88,5 @@ theorem proof_correctness :
     apply_assumption
     apply imp_false_then_b_false h₂ wf
 
-#print axioms proof_correctness
-
-/- test proof for only the truth value. Here ax case can currently not be proved -/
-theorem proof_correctness' :
-  ∀ (s : Sequent) (_ : Proof s) (m : Model) (_ : m.wf), s.evalP m = TV.t := by
-  intro s pf m wf
-  induction pf generalizing m with
-  | ax x xs ys bl hxs hys =>
-    simp
-    have hxsM : Form.atoms x ∈ (↑xs : Multiset Form) := by simpa
-    if xtv : x ∈ m.world.forced then
-      suffices evalSucc ↑ys m = TV.t by grind
-      apply evalSucc_true hys
-      grind
-    else if xtv' : x ∈ m.world.rejected then grind
-    else sorry
-  | botl xs ys bl =>
-    have hAnt : evalAnt ({ Γa := ↑(⊥ :: xs), Γb := ↑bl, Δ := ↑ys } : Sequent).Γ m = TV.f := by
-      apply evalAnt_false (f := ⊥)
-      · simp [Sequent.Γ]
-      · simp
-    grind
-  | botr xs ys prem => simp_all
-  | andl a b xs ys bl prem ih =>
-    simp_all; specialize ih m wf; grind
-  | andr a b xs ys bl prem1 prem2 ih =>
-    simp_all; specialize ih m wf; grind
-  | orl a b xs ys bl prem1 prem2 ih =>
-    simp_all; specialize ih m wf; grind
-  | orr a b xs ys bl prem ih =>
-    simp_all; specialize ih m wf; grind
-  | impr a b xs ys bl prem ih =>
-    apply eval_imp_righ_wo_ys_t
-    simp_all
-    have ih' := ih m wf
-    rcases ih' with (h₁ | ⟨x, h₂, xtv⟩) | h₂
-    . right
-      rw [eval_imp_true_iff]
-      simp_all
-      generalize hatt : m.branch.attach = ts
-      induction ts with
-      | nil => simp_all
-      | cons m' ms ms_ih =>
-        specialize ih m' (by grind)
-        sorry
-    . left
-      rcases h₂ with x_xs | ⟨x_bl, h, _, _⟩
-      . use x; grind
-      . let x := x_bl.f ⊃ x_bl.g
-        use x; grind
-    . right
-      grind [b_true_then_imp_true_branch]
-
-  | impl a b xs ys bl prem1 prem2 ih₁ ih₂ =>
-    simp_all
-    specialize ih₁ m wf
-    specialize ih₂ m wf
-    rcases ih₁ with ⟨x, hx, hxf⟩ | ha | hys
-    · left; use x; grind
-    . rcases ih₂ with ⟨x, hx, hxf⟩ | hys
-      · left
-        sorry
-      . right; exact hys
-    · right; exact hys
-
-  | afort a b xs ys bl prem ih =>
-    simp_all
-    specialize ih m wf
-    rcases ih with ⟨x, hx, hxf⟩ | hb | hys
-    . left; grind
-    . right;  left; grind [b_true_then_imp_true_branch]
-    . right; right; exact hys
-
+#print axioms Proof.soundness
 end multiSucc

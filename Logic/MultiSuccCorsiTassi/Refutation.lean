@@ -11,7 +11,7 @@ inductive Refutation : Sequent → (hs : List Imp) → Type
   | ax hs :
     ∀ (as bs: List Atom) (bl : List Imp), --xs: blocked
       (intersection : as ∩ bs = []) →
-      Refutation ⟨↑(as.map Form.atoms), ↑bl, ↑(bs.map Form.atoms)⟩ hs
+      Refutation ⟨↑(as.map Form.atom), ↑bl, ↑(bs.map Form.atom)⟩ hs
 -- Γ ⊬ Δ → Γ ⊬ ⊥,Δ
   | botr hs :
     ∀ (xs ys : List Form) (bl : List Imp),
@@ -54,8 +54,8 @@ inductive Refutation : Sequent → (hs : List Imp) → Type
     ∀ (as bs : List Atom) (ys: List Imp) (bl : List Imp),
       (intersection : as ∩ bs = []) → -- checking that atoms dont have intersection, for we still have blocked list in ys and xs has all imps we want to use the rule on
     -- a function that applies the premise to all imps in ys
-      ((a b : Form) → ⟨a,b⟩ ∈ ys →  Refutation ⟨↑(a :: (as.map .atoms) ++ (bl.map Imp.toForm)), {}, {b}⟩ (⟨a, b⟩ :: hs )) →
-      Refutation ⟨↑(as.map Form.atoms), ↑bl, ↑((bs.map Form.atoms) ++ (ys.map Imp.toForm))⟩ hs
+      ((a b : Form) → ⟨a,b⟩ ∈ ys →  Refutation ⟨↑(a :: (as.map .atom) ++ (bl.map Imp.toForm)), {}, {b}⟩ (⟨a, b⟩ :: hs )) →
+      Refutation ⟨↑(as.map Form.atom), ↑bl, ↑((bs.map Form.atom) ++ (ys.map Imp.toForm))⟩ hs
   -- (a ⊃ b, Γ ⊬ a, Δ) → (a ⊃ b, Γ ⊬ Δ)
   | impl₁ hs :
     ∀ (a b : Form) (xs ys : List Form) (bl : List Imp),

@@ -8,13 +8,8 @@ open multiSucc
 structure World where
   forced : Finset Atom
   rejected : Finset Atom
+
 deriving DecidableEq
-
-def Seq4Proof.forced (s : Seq4Proof) : Finset Atom := s.aL.toFinset
-
-def Seq4Proof.rejected (s : Seq4Proof) : Finset Atom := s.aR.toFinset
-
-def Seq4Proof.world (p : Seq4Proof) : World := ⟨p.forced, p.rejected⟩
 
 structure Model where
   world : World
@@ -26,7 +21,8 @@ def Model.wf (m : Model) : Bool :=
 ∀ fm ∈ m.branch.attach,
   fm.val.wf ∧
   m.world.forced ⊆ fm.val.world.forced ∧
-  fm.val.world.rejected ⊆ m.world.rejected
+  fm.val.world.rejected ⊆ m.world.rejected --∧
+  --Disjoint m.world.forced m.world.rejected
 decreasing_by
 all_goals
   have : sizeOf m.branch < sizeOf m := by grind [Model]
@@ -35,14 +31,14 @@ all_goals
   grind
 
 @[grind, simp]
-def Models.getUnforced : List Model → Finset Atom
+def Models.getRejected : List Model → Finset Atom
 | [] => {}
-| x :: xs => x.world.rejected ∪ Models.getUnforced xs
+| x :: xs => x.world.rejected ∪ Models.getRejected xs
 
 @[grind ., simp]
-theorem Models.getUnforced_elem {ms : List Model} (mem: m ∈ ms):
-  ∀ a ∈ m.world.rejected, a ∈ Models.getUnforced ms := by
-  intro a ah; fun_induction getUnforced <;> grind
+theorem Models.getRejected_elem {ms : List Model} (mem: m ∈ ms):
+  ∀ a ∈ m.world.rejected, a ∈ Models.getRejected ms := by
+  intro a ah; fun_induction getRejected <;> grind
 
 def Model.depth : Model → Nat
 | ⟨_, branch⟩ =>
@@ -157,9 +153,10 @@ assoc a b c := by cases a <;> cases b <;> cases c <;> rfl
 /-! # Main evaluation function -/
 @[grind]
 def Form.eval : Form → Model → TV
-| .atoms a, m => if a ∈ m.world.forced then .t
-       else if a ∈ m.world.rejected then .f
-       else .u
+| .atom a, m =>
+      if a ∈ m.world.forced then .t
+      else if a ∈ m.world.rejected then .f
+      else .u
 | .bot, _ => .f
 | .and a b, m => conjTV (a.eval m) (b.eval m )
 | .or a b, m => disjTV (a.eval m) (b.eval m )
@@ -169,19 +166,43 @@ def Form.eval : Form → Model → TV
   else if (a.eval m = .t ∧ b.eval m = .f)
       ∨ (m.branch.attach.any (λ m' => (a ⊃ b).eval m'.val = .f)) then .f --only one false
   else .u
-termination_by fm m => (sizeOf_Form fm, m.depth)
+termination_by fm m => (Form.complexity fm, m.depth)
 decreasing_by
 all_goals first | (apply Prod.Lex.left; grind) | (apply Prod.Lex.right; apply depth_lt_of_mem; grind)
 
+/- def Form.evalHist : Form → List Imp → Model → TV
+| .imp a b, h, m =>
+    if ⟨a, b⟩ ∈ h ∧ b.eval m = .f then .f
+    else
+      (a ⊃ b).eval m
+| f, _, m =>
+    f.eval m -/
 
-@[grind ., simp] theorem evaluate_atom_t (h :  (Form.atoms a).eval m = .t) : a ∈ m.world.forced := by grind
-@[grind ., simp] theorem evaluate_atom_f (h :  (Form.atoms a).eval m = .f) : a ∈ m.world.rejected := by grind
-@[grind ., simp] theorem evaluate_atom_f_and (h :  (Form.atoms a).eval m = .f) : a ∈ m.world.rejected ∧ a ∉ m.world.forced:= by grind
+theorem inHistEq {a b : Form} {h : List Imp} : ⟨a, b⟩ ∈ h → a.eval m = TV.t := by
+  intro p
+  sorry
+
+@[grind ., simp] theorem evaluate_atom_t (h :  (Form.atom a).eval m = .t) : a ∈ m.world.forced := by grind
+@[grind ., simp] theorem evaluate_atom_f (h :  (Form.atom a).eval m = .f) : a ∈ m.world.rejected := by grind
+@[grind ., simp] theorem evaluate_atom_f_and (h :  (Form.atom a).eval m = .f) : a ∈ m.world.rejected ∧ a ∉ m.world.forced:= by grind
 @[grind =, simp] theorem evaluate_bot : Form.bot.eval m = .f := by grind
 @[grind =, simp] theorem evaluate_and : (a ∧∧ b).eval m = conjTV (a.eval m) (b.eval m) := by grind
 @[grind =, simp] theorem evaluate_or : (a ∨∨ b).eval m = disjTV (a.eval m) (b.eval m) := by grind
-@[grind =, simp] theorem evaluate_atom_undef : (Form.atoms a).eval m = .u ↔ a ∉ m.world.forced ∧ a ∉ m.world.rejected := by grind
+@[grind =, simp] theorem evaluate_atom_undef : (Form.atom a).eval m = .u ↔ a ∉ m.world.forced ∧ a ∉ m.world.rejected := by grind
 
+/- @[grind =, simp]
+theorem evalHist_imp_f : (⟨a, b⟩ ∈ h ∧ b.eval m = .f ) → (a ⊃ b).evalHist h m = .f := by
+  intro hfalse
+  simp [Form.evalHist, hfalse]
+
+@[grind =, simp]
+theorem evalHist_atom : (Form.atom a).evalHist h m = (Form.atom a).eval m := by rfl
+@[grind =, simp]
+theorem evalHist_bot : ⊥.evalHist h m = ⊥.eval m := by rfl
+@[grind =, simp]
+theorem evalHist_and : (a ∧∧ b).evalHist h m = (a ∧∧ b).eval m := by rfl
+@[grind =, simp]
+theorem evalHist_or : (Form.or a b).evalHist h m = (Form.or a b).eval m := by rfl -/
 
 
 def evalBlocked : Imp → Model → TV
@@ -195,6 +216,11 @@ def evalAnt (Γ : Multiset Form) (m : Model) : TV :=
   (Γ.map (fun f => f.eval m)).fold conjTV TV.t
 scoped notation "⋀ " m:max ", " Γ:max => evalAnt Γ m
 
+/-
+def evalAntH (Γ : Multiset Form) (h : List Imp) (m : Model) : TV :=
+  (Γ.map (fun f => f.evalHist h m)).fold conjTV TV.t
+scoped notation "⋀ₕ " h:max "," m:max ", " Γ:max => evalAntH Γ h m -/
+
 def evalAntB (Γ : Multiset Imp) (m : Model) : TV :=
   (Γ.map (fun f => evalBlocked f m)).fold conjTV TV.t
 scoped notation "⋀* " m:max ", " Γ:max => evalAntB Γ m
@@ -206,27 +232,31 @@ def evalSucc (Δ : Multiset Form) (m : Model) : TV :=
   (Δ.map (fun f => f.eval m)).fold disjTV TV.f
 scoped notation "⋁ " m:max ", " Γ:max => evalSucc Γ m
 
+/- def evalSuccH (Δ : Multiset Form) (h : List Imp) (m : Model) : TV :=
+  (Δ.map (fun f => f.evalHist h m)).fold disjTV TV.f
+scoped notation "⋁ₕ " h:max "," m:max ", " Γ:max => evalSuccH Γ h m -/
+
 @[simp, grind]
-def Sequent.evalΓ : Sequent → Model → TV
-| ⟨Γa, Γb, _ ⟩,  m => conjTV (evalAnt Γa m) (evalAntB Γb m)
+def Sequent.evalΓ : Sequent  → Model → TV
+| ⟨Γ, Θ, _ ⟩,  m => conjTV (evalAnt Γ m) (evalAntB Θ m)
 
 -- A sequent is refutable iff all its assumptions are satisfied (all forms in Γ are true) but none of the conclusions are (all Δ are false)
-@[grind]
-def Sequent.evalR : Sequent → Model → TV
-| s,  m =>
-  match s.evalΓ m, evalSucc s.Δ m with
-  | .t, .f => .f
-  | .f, _ | _, .t => .t
-  | _, _ => .u
 
 @[grind]
 def Sequent.evalP : Sequent → Model → TV
 | s,  m =>
-  match evalAnt s.Γ m, evalSucc s.Δ m with
+  match evalAnt s.ant m, evalSucc s.Δ m with
   | .t, .f => .f
   | .f, _ | _, .t => .t
   | _, _ => .u
 
+@[grind]
+def Sequent.evalR : Sequent → List Imp → Model → TV
+| s, h, m =>
+  match s.evalΓ m, evalSucc s.Δ m with
+  | .t, .f => .f
+  | .f, _ | _, .t => .t
+  | _, _ => .u
 
 lemma beq_f_true_eq {v : TV} :
   (v = TV.f) → v = TV.f := by
@@ -251,25 +281,25 @@ variable {s : Sequent}
 @[simp]
 theorem Sequent.evalP_true_iff :
   s.evalP m = TV.t ↔
-  evalAnt s.Γ m = TV.f ∨ evalSucc s.Δ m = TV.t := by
+  evalAnt s.ant m = TV.f ∨ evalSucc s.Δ m = TV.t := by
   grind
 
 @[simp]
 theorem Sequent.evalP_false_iff :
   s.evalP m = TV.f ↔
-  evalAnt s.Γ m = TV.t ∧ evalSucc s.Δ m = TV.f := by
+  evalAnt s.ant m = TV.t ∧ evalSucc s.Δ m = TV.f := by
   simp [Sequent.evalP]
   split <;> grind
 
 @[simp]
 theorem Sequent.evalR_true_iff :
-  s.evalR m = TV.t ↔
+  s.evalR h m = TV.t ↔
   s.evalΓ m = TV.f ∨ evalSucc s.Δ m = TV.t := by
   grind
 
 @[simp]
 theorem Sequent.evalR_false_iff :
-  s.evalR m = TV.f ↔
+  s.evalR h m = TV.f ↔
   s.evalΓ m = TV.t ∧ evalSucc s.Δ m = TV.f := by
   simp [Sequent.evalR]
   split <;> grind
@@ -295,9 +325,11 @@ lemma evalSucc_not_f (h : x ∈ ys) (hx : x.eval m = .u) : ¬⋁ m, ys = TV.f :=
     · simp_all [evalSucc]
 
 @[grind =, simp] lemma evalSucc_bot_cons : ⋁ m, ↑(⊥ :: xs) = ⋁ m, ↑xs := by simp [evalSucc]
+--@[grind =, simp] lemma evalSuccH_bot_cons : ⋁ₕ h, m, ↑(⊥ :: xs) = ⋁ₕ h, m, ↑xs := by simp [evalSuccH, evalHist_bot]
 @[grind =, simp] lemma evalAnt_bot_cons : ⋀ m, ↑(⊥ :: xs) = .f := by simp [evalAnt]
 @[grind =, simp] lemma evalAnt_conj : ⋀ m, ↑((a ∧∧ b) :: xs) = ⋀ m, ↑(a :: b :: xs) := by simp [evalAnt]; grind
 @[grind =, simp] lemma evalSucc_conj : ⋁ m, ↑((a ∨∨ b) :: xs) = ⋁ m, ↑(a :: b :: xs) := by simp [evalSucc]; grind
+--@[grind =, simp] lemma evalSuccH_conj : ⋁ₕ h, m, ↑((a ∨∨ b) :: xs) = ⋁ₕ h, m, ↑(a :: b :: xs) := by simp [evalSuccH, evalHist_or]; grind
 @[grind =, simp] lemma evalSucc_cons {xs : List Form} : ⋁ m, ↑(a :: xs) = disjTV (a.eval m) (⋁ m, ↑xs) := by simp [evalSucc]
 @[grind =, simp] lemma evalAnt_cons {xs : List Form} : ⋀ m, ↑(a :: xs) = conjTV (a.eval m) (⋀ m, ↑xs) := by simp [evalAnt]
 
@@ -332,7 +364,7 @@ lemma evalSucc_true (fin : f ∈ Δ ) (ev : f.eval m = TV.t ): evalSucc Δ m = T
 lemma evalAnt_false (h₁ : f ∈ Γ) (h₂ : f.eval m = TV.f) : evalAnt Γ m = TV.f := by
   simp; grind
 @[grind ., simp]
-lemma evalAntB_false (h₁ : f ∈ s.Γb) (h₂ : evalBlocked f m = TV.f) : s.evalΓ m = TV.f := by
+lemma evalAntB_false (h₁ : f ∈ s.Θ) (h₂ : evalBlocked f m = TV.f) : s.evalΓ m = TV.f := by
   simp; grind
 
 
@@ -370,13 +402,13 @@ theorem evalBlocked_false_iff :
   . intro h; rw [evalBlocked]; simp_all; grind
 
 theorem eval_imp_righ_wo_ys :
-  Sequent.evalP { Γa := xs, Γb := xs', Δ := {a ⊃ b} } m ≠ TV.f →
-  Sequent.evalP { Γa := xs, Γb := xs', Δ := ↑((a ⊃ b) :: ys) } m ≠ TV.f := by
+  Sequent.evalP { Γ := xs, Θ := xs', Δ := {a ⊃ b} } m ≠ TV.f →
+  Sequent.evalP { Γ := xs, Θ := xs', Δ := ↑((a ⊃ b) :: ys) } m ≠ TV.f := by
   simp; intro h₁ h₂; simp_all
 
 theorem eval_imp_righ_wo_ys_t :
-  Sequent.evalP { Γa := xs, Γb := xs', Δ := {a ⊃ b} } m = TV.t →
-  Sequent.evalP { Γa := xs, Γb := xs', Δ := ↑((a ⊃ b) :: ys) } m = TV.t := by
+  Sequent.evalP { Γ := xs, Θ := xs', Δ := {a ⊃ b} } m = TV.t →
+  Sequent.evalP { Γ := xs, Θ := xs', Δ := ↑((a ⊃ b) :: ys) } m = TV.t := by
   simp; intro h₁; grind
 
 @[grind ., simp]
@@ -417,7 +449,7 @@ theorem Model.momo_branch_true {f : Form} {m m' : Model}
   specialize h m' mem
   obtain ⟨mf', fo, unfo⟩ := h
   match f with
-  | .atoms a => grind
+  | .atom a => grind
   | .bot => grind
   | .and a b =>
     simp_all
@@ -473,7 +505,7 @@ theorem Model.mono_branch_false {f : Form} {m m' : Model}
   specialize h m' mem
   obtain ⟨mf', fo, unfo⟩ := h
   match f with
-  | .atoms a =>
+  | .atom a =>
     apply evaluate_atom_f_and at ftv; simp [Form.eval]; grind
   | .bot => grind
   | .and a b =>

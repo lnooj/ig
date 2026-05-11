@@ -11,23 +11,23 @@ open multiSucc
 Atomic values get valued as one , not as 0, to help show termination for the atomic case in antecedent, same with bottom.
  -/
 @[simp, grind]
-def sizeOf_Form : Form → Nat
+def Form.complexity : Form → Nat
   | ⊥ => 1
-  | .atoms _ => 1
-  | .and p q => 1 + sizeOf_Form p + sizeOf_Form q
-  | .or p q => 1 + sizeOf_Form p + sizeOf_Form q
-  | .imp p q => 1 + sizeOf_Form p + sizeOf_Form q
+  | .atom _ => 1
+  | .and p q => 1 + p.complexity + q.complexity
+  | .or p q => 1 + p.complexity + q.complexity
+  | .imp p q => 1 + p.complexity + q.complexity
 
 --complexity of set of principle formulas: nr of logical symbols occuring in them
 @[grind,simp]
-def size_sum : List Form → Nat
+def Form.listComplexity : List Form → Nat
   | [] => 0
-  | f :: fs => 2 * sizeOf_Form f + size_sum fs
+  | f :: fs => 2 * complexity f + Form.listComplexity fs
 
 @[grind,simp]
-def size_sum_increased : List Form → Nat
+def Form.listComplexity' : List Form → Nat
   | [] => 0
-  | f :: fs => 2 * sizeOf_Form f + 1 + size_sum_increased fs
+  | f :: fs => 2 * complexity f + 1 + Form.listComplexity' fs
 
 
 /-- weight function based on paper to prove termination :
@@ -39,7 +39,6 @@ def size_sum_increased : List Form → Nat
 structure Weight where
   cap_r : ℕ -- cap - r
   n : ℕ
-  --hr : r ≤ cap
 
 namespace Weight
 -- now it is a Lex order
@@ -69,7 +68,7 @@ end Weight
 @[simp, grind]
 def collectImpsForm (x : Form) : Finset Imp :=
 match x with
-  | .bot | .atoms _ =>  ∅
+  | .bot | .atom _ =>  ∅
   | .and a b | .or a b => collectImpsForm a ∪ collectImpsForm b
   | .imp a b => {⟨a, b⟩} ∪ collectImpsForm a ∪ collectImpsForm b
 
@@ -88,7 +87,7 @@ theorem collectImps_equality : ∀ (x : Imp), collectImpsImp x = collectImpsForm
 - every imp list is gone through recursively to collect ALL implications, exept the R→ list itsself (history)-/
 @[simp, grind]
 def Seq4Proof.cap (p : Seq4Proof) : Finset Imp:=
-   p.fL.toFinset.biUnion collectImpsForm ∪ p.block.toFinset.biUnion collectImpsImp ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
+  p.fL.toFinset.biUnion collectImpsForm ∪ p.block.toFinset.biUnion collectImpsImp ∪ -- toFinset.biUnion usedImps1 as well to ease proof on fist rec call
   p.fR.toFinset.biUnion collectImpsForm ∪ p.impR.toFinset.biUnion collectImpsImp ∪ p.hist.toFinset -- rightImp gets also counted recursively, because when applying R→ the left and right side go to forms
 
 /-- occurences of R→ rule so far, stored in history  -/
@@ -102,15 +101,14 @@ theorem Seq4Proof.r_subset_cap (p : Seq4Proof) : p.r ⊆ p.cap := by simp only [
 - given a sequent p, global cap.card and proof that current sequents cap is smaller than global
 - sixeOf_Form is used, not complexity, for some cases this doesn't change
 - the forms list size must be higher than the imp lists, for in our recursive calls we might only move the implications to appropriate lists,
-  functionally doing nothing but it still must decrease. atoms donn't make a difference here -/
+  functionally doing nothing but it still must decrease. atoms don't make a difference here -/
 def Seq4Proof.weight (p : Seq4Proof) (cap : ℕ)  : Weight :=
 let r := cap - p.r.card
 let n :=
-      let cL := size_sum p.fL--(countPrinciple forms₁ blocked)-- forms in blocked can not be principle PRINCIPLE LOGIC NOT USED
-      let cR := size_sum_increased p.fR --any imp on right side can be principle, bc either a fort is used or R→
-      --let cImpL := size_sum imps₁
-      let cImpR := size_sum (p.impR.map Imp.toForm)
-      cL + cR + cImpR--+ cImpL + cImpR
+  let cL := Form.listComplexity p.fL
+  let cR := Form.listComplexity' p.fR
+  let cImpR := Form.listComplexity (p.impR.map Imp.toForm)
+  cL + cR + cImpR
 { cap_r := r , n := n}
 
 @[simp, grind]
@@ -121,7 +119,7 @@ theorem Seq4Proof.weight_cap_r (p : Seq4Proof) (cap : ℕ) :
 @[simp, grind]
 theorem Seq4Proof.weight_n (p : Seq4Proof) (cap : ℕ) :
     (p.weight cap).n =
-      size_sum p.fL + size_sum_increased p.fR + size_sum (p.impR.map Imp.toForm) := by
+      Form.listComplexity p.fL + Form.listComplexity' p.fR + Form.listComplexity (p.impR.map Imp.toForm) := by
   simp [Seq4Proof.weight]
 
 @[grind .]

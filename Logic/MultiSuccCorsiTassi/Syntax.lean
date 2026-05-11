@@ -20,7 +20,7 @@ syntax multiset " ⊢ " multiset : sequent
 
 syntax "~" term:max : form
 
-syntax "(" form " → " form ")" : form
+syntax "(" form " ⊃ " form ")" : form
 syntax "(" form " ∧ " form ")" : form
 syntax "(" form " ∨ " form ")" : form
 syntax "¬" form        : form
@@ -41,13 +41,13 @@ macro_rules
 | `(mult { $[$fs:form],* }) => `(Multiset.ofList [ $[form {$fs}],* ])
 | `(seq { $Γ:multiset ⊢ $Δ:multiset }) =>
       `(Sequent.mk (mult {$Γ}) {} (mult {$Δ}))
-| `(form {($a → $b)} ) => `(Form.imp form {$a} form {$b})
+| `(form {($a ⊃ $b)} ) => `(Form.imp form {$a} form {$b})
 | `(form {($a ∧ $b)} ) => `(Form.and form {$a} form {$b})
 | `(form {($a ∨ $b)} ) => `(Form.or form {$a} form {$b})
 | `(form {¬$a} ) => `(Form.imp form {$a} form {⊥})
 | `(form { ⊥ }) => `(Form.bot)
-| `(form {$a:atom}) => `(Form.atoms (atom {$a}))
+| `(form {$a:atom}) => `(Form.atom (atom {$a}))
 
-#check seq {p,( p → q) ⊢ r}
-#check form {(p → q)}
+#check seq {p,( p ⊃ q) ⊢ r}
+#check form {(p ⊃ q)}
 #check seq { ⊢ r, p}

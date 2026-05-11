@@ -430,7 +430,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 #eval! automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
 
 #eval! automatedProofHelper (seq {⊢ ((p → (p → q)) → (p → q))})
-#eval! automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))}) --no proof in single succ system
+#eval! automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))})
 #eval! automatedProofHelper (seq {⊢ ¬¬ (¬p ∨ p)})
 
 #eval! automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})

@@ -8,9 +8,9 @@ structure Atom where
   atom : Nat
 deriving DecidableEq, Repr
 
-inductive Form
+inductive Form where
 | bot : Form
-| atoms : Atom → Form
+| atom : Atom → Form
 | and : Form → Form → Form
 | or : Form → Form → Form
 | imp : Form → Form → Form
@@ -42,26 +42,16 @@ lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 @[simp, grind]
 def Imp.toForm (i : Imp) : Form := i.f ⊃ i.g
 
-/- /- Top-level change to add impB to Seq. Sequent element is either a form or a blocked imp type -/
-inductive SequentElem where
-| pure   : Form → SequentElem
-| blocked : Imp → SequentElem
-deriving DecidableEq, Repr
-
-@[simp]
-def SequentElem.toForm : SequentElem → Form
-| SequentElem.pure f   => f
-| SequentElem.blocked b => Imp.toForm b -/
 
 -- Using Multisets to not worry about order of forms
 @[grind]
 structure Sequent where
-  Γa : Multiset Form
-  Γb : Multiset Imp -- blocked implication seperate, seperate semantics
+  Γ : Multiset Form
+  Θ : Multiset Imp -- blocked implication seperate, seperate semantics
   Δ : Multiset Form
 
 @[grind, simp]
-def Sequent.Γ (s : Sequent) := s.Γa ∪ s.Γb.map Imp.toForm
+def Sequent.ant (s : Sequent) := s.Γ ∪ s.Θ.map Imp.toForm
 
 
 /-
@@ -86,7 +76,7 @@ structure Seq4Proof where
 @[simp]
 def Form.encode : Form → List Nat
   | bot        => [0]
-  | atoms a    => [1, a.atom]
+  | atom a    => [1, a.atom]
   | and f g    => [2, (encode f).length] ++ encode f ++ encode g
   | or f g     => [3, (encode f).length] ++ encode f ++ encode g
   | imp f g    => [4, (encode f).length] ++ encode f ++ encode g
@@ -102,13 +92,13 @@ theorem form_inj {f : Form} (h : f.encode = g.encode) :
   f = g := by
   match f, g with
   | .bot, .bot => rfl
-  | .bot, .atoms _ => simp only [Form.encode, List.cons.injEq, Nat.zero_ne_one, List.ne_cons_self,
+  | .bot, .atom _ => simp only [Form.encode, List.cons.injEq, Nat.zero_ne_one, List.ne_cons_self,
     and_self] at h
-  | .atoms _, .bot => simp only [Form.encode, List.cons.injEq, Nat.succ_ne_self, List.cons_ne_self,
+  | .atom _, .bot => simp only [Form.encode, List.cons.injEq, Nat.succ_ne_self, List.cons_ne_self,
     and_self] at h
-  | .atoms a, .atoms b =>
+  | .atom a, .atom b =>
     simp only [Form.encode, List.cons.injEq, and_true, true_and] at h
-    apply congrArg Form.atoms (Atom.ext h)
+    apply congrArg Form.atom (Atom.ext h)
   | .and f g, .and f' g' =>
     simp_all only [Form.encode, List.cons_append, List.nil_append, List.cons.injEq, true_and,
       Form.and.injEq]
@@ -150,7 +140,7 @@ instance : LinearOrder Imp :=
   LinearOrder.lift' Imp.encode (fun _ _ h => Imp.ext h)
 
 def example1 : Multiset Nat := {3, 1, 2, 2}
-def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
+def example2 : Multiset Form := {.atom ( Atom.mk 1), .bot, .bot}
 
 /-
    We can turn multisets into (computable) sorted lists with `sort`
@@ -160,20 +150,20 @@ def example2 : Multiset Form := {.atoms ( Atom.mk 1), .bot, .bot}
 #eval Multiset.sort example1 LE.le
 #eval Multiset.sort example2 LE.le
 
-def Sequent.Γa_getList { s : Sequent} : List Form := Multiset.sort s.Γa LE.le
-def Sequent.Γb_getList { s : Sequent} : List Imp := Multiset.sort s.Γb LE.le
+def Sequent.Γ_getList { s : Sequent} : List Form := Multiset.sort s.Γ LE.le
+def Sequent.Θ_getList { s : Sequent} : List Imp := Multiset.sort s.Θ LE.le
 def Sequent.Δ_getList { s : Sequent} : List Form := Multiset.sort s.Δ LE.le
 
 
 @[simp]
 def Seq4Proof.toSeq (p : Seq4Proof ): Sequent :=
-  have antPure := Multiset.ofList ((p.aL.map Form.atoms) ++ p.fL)
+  have antPure := Multiset.ofList ((p.aL.map Form.atom) ++ p.fL)
   have antBlocked := Multiset.ofList p.block
-  have succ := Multiset.ofList ((p.aR.map Form.atoms) ++ p.fR ++ (p.impR.map Imp.toForm))
+  have succ := Multiset.ofList ((p.aR.map Form.atom) ++ p.fR ++ (p.impR.map Imp.toForm))
   ⟨antPure, antBlocked, succ⟩
 
 
 def Sequent.toSeq4 (s : Sequent) : Seq4Proof :=
-Seq4Proof.mk [] s.Γa_getList s.Γb_getList [] s.Δ_getList [] []
+Seq4Proof.mk [] s.Γ_getList s.Θ_getList [] s.Δ_getList [] []
 
 end multiSucc

@@ -17,7 +17,7 @@ instance : ToString Atom where
 
 def Form.toString : Form → String
   | .bot => "⊥"
-  | .atoms a => ToString.toString a
+  | .atom a => ToString.toString a
   | .imp a .bot => s!"¬{a.toString}"
   | .and a b => s!"({a.toString} ∧ {b.toString})"
   | .or a b => "(" ++ a.toString ++ " ∨ " ++ b.toString ++ ")"
@@ -125,7 +125,7 @@ instance : ToString (List (Proof xseq)) where
 
 def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refutation xseq h → String
 | .ax h as bs bl _ =>
-  indent indentLvl s!"AX: {listToString (as.map Form.atoms) ++ listToStringB bl} , ⊬ {listToString (bs.map Form.atoms)}"
+  indent indentLvl s!"AX: {listToString (as.map Form.atom) ++ listToStringB bl} , ⊬ {listToString (bs.map Form.atom)}"
 | .botr h xs ys bl proof =>
   let premise := refutationToString (indentLvl + 1) proof
   let ruleLine :=
@@ -168,7 +168,7 @@ def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : Refu
     ys.attach.map (fun imp =>
       match imp with
       | ⟨⟨a, b⟩, hmem⟩ => refutationToString (indentLvl + 1) (proof a b hmem))
-  let ruleLine := s!"→R: {listToString (as.map .atoms) ++ listToStringB bl} ⊬ {listToString (bs.map .atoms) ++ listToString (ys.map Imp.toForm)}"
+  let ruleLine := s!"→R: {listToString (as.map .atom) ++ listToStringB bl} ⊬ {listToString (bs.map .atom) ++ listToString (ys.map Imp.toForm)}"
   s!"{String.intercalate "\n" premises}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .afort h a b xs ys bl _ proof  =>
   let premise := refutationToString (indentLvl + 1) proof

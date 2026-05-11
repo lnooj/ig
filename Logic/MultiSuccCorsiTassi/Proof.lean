@@ -7,8 +7,8 @@ inductive Proof : Sequent → Type
   -- ∀ x Γ, x ++ Γ ⊢ x ++ Δ
   | ax :
     ∀ (x : Atom) (xs ys : List Form) (bl : List Imp),
-      (hxs : .atoms x ∈ xs) →
-      (hys : .atoms x ∈ ys) →
+      (hxs : .atom x ∈ xs) →
+      (hys : .atom x ∈ ys) →
       Proof ⟨↑xs, ↑bl, ↑ys⟩
   -- ∀ Δ Γ, (⊥, Γ ⊢ Δ)
   | botl :

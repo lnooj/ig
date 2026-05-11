@@ -131,7 +131,7 @@ theorem List.findSome?_ne_none_of_mem {xs : List α} {f : α → Option β} {x :
 theorem Subtype.prop_map
 (rfs : List { rf : List ((a : Form) ×
           (b : Form) ×
-            Refutation { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+            Refutation { Γ := ↑(a :: List.map Form.atom as ++ List.map Imp.toForm block), Θ := ∅, Δ := {b} }
               ({ f := a, g := b } :: hist)) // rf ≠ [] }) : [] ∉ rfs.unattach := by
   simp_all only [ne_eq, List.mem_unattach, not_true_eq_false, IsEmpty.exists_iff, not_false_eq_true]
 

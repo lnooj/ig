@@ -16,7 +16,7 @@ open Refutation
 abbrev ImpRRefut (hist block : List Imp) (as : List Atom) : Type :=
   (a : Form) × (b : Form) ×
     Refutation
-      { Γa := ↑(a :: List.map Form.atoms as ++ List.map Imp.toForm block), Γb := ∅, Δ := {b} }
+      { Γ := ↑(a :: List.map Form.atom as ++ List.map Imp.toForm block), Θ := ∅, Δ := {b} }
       ({ f := a, g := b } :: hist)
 
 abbrev ImpRRow (impR hist block : List Imp) (as : List Atom)
@@ -77,7 +77,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
     match fL with
     | [] =>
       match fR with
-      | [] => -- succedent only has atoms left --
+      | [] => -- succedent only has atom left --
         match common : aL ∩ aR with --CHANGED
         -- no common atoms
         | [] =>
@@ -93,8 +93,8 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
             let refut := ImpRRefut hist block aL
 
             let proof :=
-              {pf : List (Proof ⟨↑(aL.map Form.atoms), ↑block,
-                ↑(aR.map Form.atoms ++ impR.map Imp.toForm)⟩) // pf ≠ []}
+              {pf : List (Proof ⟨↑(aL.map Form.atom), ↑block,
+                ↑(aR.map Form.atom ++ impR.map Imp.toForm)⟩) // pf ≠ []}
 
             let row (u : {i : Imp // i ∈ impR}) :=
               ImpRRow impR hist block aL u
@@ -105,8 +105,8 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                 | ⟨⟨f, g⟩, ha⟩ =>
                   have premise := automatedProof ⟨aL, (f :: (block.map Imp.toForm)), [], [], [g], [], (⟨ f, g⟩ :: hist)⟩ cap
                                                   (by grw [← hcap]; simp; apply Finset.card_le_card ?_; simp_all; grind) (by simp)
-                  let xs := aL.map Form.atoms
-                  let ys := aR.map Form.atoms ++ (impR.erase ⟨f, g⟩).map Imp.toForm
+                  let xs := aL.map Form.atom
+                  let ys := aR.map Form.atom ++ (impR.erase ⟨f, g⟩).map Imp.toForm
                   have ruleP := impr f g xs ys block
                   match premise with
                   | .proof pf neqE => .inl ⟨pf.map (λ p ↦ (ruleP p.castSeq).castSeq), by simpa using neqE⟩
@@ -179,39 +179,39 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                                   exact (List.attach_ne_nil_iff.mpr chs_ne) this)
         | xs@(_::_) => by
           let proofs := xs.attach.map (λ ⟨x, hx⟩ ↦
-                        Proof.ax x ((aL.map Form.atoms)) ((aR.map Form.atoms) ++ (impR.map Imp.toForm)) block
+                        Proof.ax x ((aL.map Form.atom)) ((aR.map Form.atom) ++ (impR.map Imp.toForm)) block
                         (by grind)
                         (by grind))
           simp only [Seq4Proof.toSeq, List.append_nil]; exact Result.proof proofs (by grind)
 
       -- open up forms on right side
-      | (.atoms a) :: succForms =>  --move atom to succ atoms list
+      | (.atom a) :: succForms =>  --move atom to succ atom list
         Result.castSeq (automatedProof ⟨aL, [], block, a :: aR, succForms, impR, hist⟩ cap)
 
       | ⊥ :: succForms =>   --botr rule, .bot is ignored
         have premise := automatedProof ⟨aL, [], block, aR, succForms, impR, hist⟩ cap
-        let ys := (aR.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
-        have ruleP := Proof.botr (aL.map .atoms) ys block; have ruleR := Refutation.botr hist (aL.map .atoms) ys block
+        let ys := (aR.map .atom) ++ succForms ++ (impR.map Imp.toForm)
+        have ruleP := Proof.botr (aL.map .atom) ys block; have ruleR := Refutation.botr hist (aL.map .atom) ys block
         (premise.castSeq.map hist ruleP ruleR).castSeq
 
       | (.and a b) :: succForms =>
         have premise₁ := automatedProof ⟨aL, [], block, aR, a :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
         have premise₂ := automatedProof ⟨aL, [], block, aR, b :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-        let ys := (aR.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
-        have ruleP := andr a b (aL.map .atoms) ys block;
-        have ruleR₁ := andr₁ hist a b (aL.map .atoms) ys block; have ruleR₂ := andr₂ hist a b (aL.map .atoms) ys block
+        let ys := (aR.map .atom) ++ succForms ++ (impR.map Imp.toForm)
+        have ruleP := andr a b (aL.map .atom) ys block;
+        have ruleR₁ := andr₁ hist a b (aL.map .atom) ys block; have ruleR₂ := andr₂ hist a b (aL.map .atom) ys block
         (Result.map2proof premise₁.castSeq premise₂.castSeq ruleP ruleR₁ ruleR₂).castSeq
 
       | (.or a b) :: succForms =>
         have premise := automatedProof ⟨aL, [], block, aR, a :: b :: succForms, impR, hist⟩ cap
-        let xs := aL.map .atoms; let ys := (aR.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
+        let xs := aL.map .atom; let ys := (aR.map .atom) ++ succForms ++ (impR.map Imp.toForm)
         have ruleP := orr a b xs ys block; have ruleR := orr hist a b xs ys block
         (premise.castSeq.map hist ruleP ruleR).castSeq
 
       | (.imp a b) :: succForms =>  --METARULE 2 apply afort only when R→ has been used (if it is in usedImps₂. else: läheb imps listi)
         if inc : ⟨a,b⟩ ∈ hist then
           have premise := automatedProof ⟨aL, [], block, aR, b :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-          let xs := aL.map .atoms; let ys := (aR.map .atoms) ++ succForms ++ (impR.map Imp.toForm)
+          let xs := aL.map .atom; let ys := (aR.map .atom) ++ succForms ++ (impR.map Imp.toForm)
           have ruleP := afort a b xs ys block; have ruleR := afort hist a b xs ys block (by grind)
           (premise.castSeq.map hist ruleP ruleR).castSeq
         else
@@ -219,24 +219,24 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                             (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind) (by simp at metaR1; simp; grind))
 
     -- open up forms on left side --
-    | (.atoms a) :: antForms =>
+    | (.atom a) :: antForms =>
       .castSeq (automatedProof ⟨aL ++ [a], antForms, block, aR, fR, impR, hist⟩ cap)
 
     | .bot :: antForms => by
-      let rule := [botl (aL.map .atoms ++ antForms) ((aR.map .atoms) ++ fR ++ (impR.map Imp.toForm)) block]
+      let rule := [botl (aL.map .atom ++ antForms) ((aR.map .atom) ++ fR ++ (impR.map Imp.toForm)) block]
       simp only [Seq4Proof.toSeq]
       exact .proof (Proof.castSeqList rule) (by grind)
 
     | (.and a b) :: antForms =>
       have premise := automatedProof ⟨aL, a :: b :: antForms, block, aR, fR, impR, hist⟩ cap
-      let xs := (aL.map .atoms) ++ antForms; let ys := (aR.map .atoms) ++ fR ++ (impR.map Imp.toForm)
+      let xs := (aL.map .atom) ++ antForms; let ys := (aR.map .atom) ++ fR ++ (impR.map Imp.toForm)
       have ruleP := andl a b xs ys block; have ruleR := Refutation.andl hist a b xs ys block
       (premise.castSeq.map hist ruleP ruleR).castSeq
 
     | (.or a b) :: antForms =>
       have premise₁ := automatedProof ⟨aL, a :: antForms, block, aR, fR, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
       have premise₂ := automatedProof ⟨aL, b :: antForms, block, aR, fR, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-      let xs := (aL.map .atoms) ++ antForms; let ys := (aR.map .atoms) ++ fR ++ (impR.map Imp.toForm)
+      let xs := (aL.map .atom) ++ antForms; let ys := (aR.map .atom) ++ fR ++ (impR.map Imp.toForm)
       have ruleP := orl a b xs ys block
       have ruleR₁ := orl₁ hist a b xs ys block; have ruleR₂ := orl₂ hist a b xs ys block
       (Result.map2proof premise₁.castSeq premise₂.castSeq ruleP ruleR₁ ruleR₂).castSeq
@@ -244,7 +244,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
     | (.imp a b) :: antForms =>
       have premise₁ := automatedProof ⟨aL, antForms, ⟨a, b⟩ :: block, aR, a::fR, impR, hist⟩ cap
       have premise₂ := automatedProof ⟨aL, b::antForms, block, aR, fR, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
-      let xs := (aL.map .atoms) ++ antForms; let ys := (aR.map .atoms) ++ fR ++ (impR.map Imp.toForm)
+      let xs := (aL.map .atom) ++ antForms; let ys := (aR.map .atom) ++ fR ++ (impR.map Imp.toForm)
       have ruleP := impl a b xs ys block; have ruleR₁ := impl₁ hist a b xs ys block; have ruleR₂ := impl₂ hist a b xs ys block
       (Result.map2proof (premise₁.castSeq) premise₂.castSeq ruleP ruleR₁ ruleR₂).castSeq
 
@@ -290,26 +290,26 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
   | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf /- ++ listModelToString (rf.map (λ r ↦ r.getCM)) -/)
 
 --modusponens "a → b, a ⊢ β"
-#eval! automatedProofHelper (seq {(p → q), p ⊢ q})
+#eval! automatedProofHelper (seq {(p ⊃ q), p ⊢ q})
 #eval! automatedProofHelper (seq {(p ∨ q), ¬p ⊢ q})
 #eval! automatedProofHelper (seq {p ⊢ (q ∨ p)})
 
-#eval! automatedProofHelper (seq {⊢ ((p → (p → q)) → (p → q))})
+#eval! automatedProofHelper (seq {⊢ ((p ⊃ (p ⊃ q)) ⊃ (p ⊃ q))})
 #eval! automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
 
 #eval! automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))})
 
 #eval! automatedProofHelper (seq {⊢ ¬¬ (¬p ∨ p)})
-#eval! automatedProofHelper (seq {(p → r), (q → ¬r) ⊢ ¬(p ∧ q)})
+#eval! automatedProofHelper (seq {(p ⊃ r), (q ⊃ ¬r) ⊢ ¬(p ∧ q)})
 --from corsi tassi article
-#eval! automatedProofHelper (seq { ⊢ (((((p → r) → p) → p) → ⊥) → ⊥)})
+#eval! automatedProofHelper (seq { ⊢ (((((p ⊃ r) ⊃ p) ⊃ p) ⊃ ⊥) ⊃ ⊥)})
 
-#eval! automatedProofHelper (seq { ⊢ ((¬ p → ¬ q) → (q → p))})
--- Pierce ((p → q )→ p) → p
-#eval! automatedProofHelper (seq {⊢ (((p → q )→ p) → p)})
+#eval! automatedProofHelper (seq { ⊢ ((¬ p ⊃ ¬ q) ⊃ (q ⊃ p))})
+-- Pierce ((p ⊃ q )⊃ p) ⊃ p
+#eval! automatedProofHelper (seq {⊢ (((p ⊃ q )⊃ p) ⊃ p)})
 #eval! automatedProofHelper (seq {⊢ (p ∨ ¬p )})
-#eval! automatedProofHelper (seq {⊢ (((p → r) → p) → r)})
---#eval! evaluate (form {((¬ p → ¬ q) → (q → p))})
+#eval! automatedProofHelper (seq {⊢ (((p ⊃ r) ⊃ p) ⊃ r)})
+--#eval! evaluate (form {((¬ p ⊃ ¬ q) ⊃ (q ⊃ p))})
 #print axioms automatedProofHelper
 end multiSucc
 
