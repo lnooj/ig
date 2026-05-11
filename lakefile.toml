@@ -1,6 +1,6 @@
-name = "logic"
+name = "Logic"
 version = "0.1.0"
-defaultTargets = ["logic"]
+defaultTargets = ["Logic"]
 
 [[lean_lib]]
 name = "Logic"
