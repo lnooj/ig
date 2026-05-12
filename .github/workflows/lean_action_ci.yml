@@ -15,7 +15,6 @@ jobs:
 
       - name: Build docs
         run: |
-          lake update Logic
           lake build Logic:docs
         working-directory: docbuild
       - name: Upload artifact
