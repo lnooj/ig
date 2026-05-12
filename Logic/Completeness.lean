@@ -56,13 +56,27 @@ theorem RIG.cm_wf (r : RIG s h) : r.getCM.wf := by
       exact ha_forced
     . intro b hb
       suffices mm : b ∈ Kripkes.getRejected (ys.attach.map (fun ⟨⟨a, b⟩, h⟩ => (prem a b h).getCM)) by simp_all
-      have hmem : b ∈ (prem f g imp_in).getCM.world.rejected := by grind
+      have hmem : b ∈ (prem f g imp_in).getCM.world.rejected := hb
       apply Kripkes.getRejected_elem (by grind) b hmem
 
 
+def RIG.wf (r : RIG s h) : Prop :=
+( (r.getCM).evalAnt s = TV.t ∧ (r.getCM).evalSucc s.Δ = TV.f → (r.getCM).evalH h = TV.t) ∧
+( r.getCM.evalΓ (s.Γ ∪ s.Θ.map (λ f ↦ f.toForm)) = TV.t → (r.getCM).evalH h = TV.t)
+
+theorem RIG.wf_afort (wf : (RIG.afort hs a b xs ys bl hhs prem).wf) : prem.wf := by
+  simp_all [RIG.wf]
+  intro h₁ h₂ h₃ h₄
+  replace wf := wf.left h₁ h₂
+  apply wf _ h₄
+  clear h₁ h₂ h₄ wf
+
+  sorry
+
 /- TODO: problem with proving that all left imp sides in hist list evaluate to true -/
-theorem RIG.completeness (s : Sequent) ( r : RIG s h) :
-  /- (i : (evalAnt s.Γ r.getCM ∧ h.eval r.getCM ) = TV.t) -/
+theorem RIG.completeness (s : Sequent) (r : RIG s h)-- (i : r.wf)
+  :
+
       s.evalR h r.getCM = TV.f := by
   have wf := r.cm_wf
   induction r with

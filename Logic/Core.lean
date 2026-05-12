@@ -37,14 +37,13 @@ infixl:60 " ⊃ " => Imp
 
 /- Defining negation as → ⊥  from the getgo-/
 def Form.neg (a : Form) : Form :=  a ⊃ ⊥
-lemma neg_eq_imp_bot (a : Form) : .neg a = a ⊃ ⊥ := by rfl
 
 @[simp, grind]
 def Imp.toForm (i : Imp) : Form := i.f ⊃ i.g
 
 
 -- Using Multisets to not worry about order of forms
-@[grind]
+@[grind, ext]
 structure Sequent where
   Γ : Multiset Form
   Θ : Multiset Imp -- blocked implication seperate, seperate semantics

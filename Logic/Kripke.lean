@@ -212,40 +212,42 @@ def evalBlocked : Imp → Kripke → TV
   else .u
 
 
-def evalAnt (Γ : Multiset Form) (m : Kripke) : TV :=
+def Kripke.evalΓ (Γ : Multiset Form) (m : Kripke) : TV :=
   (Γ.map (fun f => f.eval m)).fold conjTV TV.t
-scoped notation "⋀ " m:max ", " Γ:max => evalAnt Γ m
+scoped notation "⋀ " m:max ", " Γ:max => Kripke.evalΓ Γ m
 
 /-
-def evalAntH (Γ : Multiset Form) (h : List Imp) (m : Kripke) : TV :=
+def Kripke.evalΓH (Γ : Multiset Form) (h : List Imp) (m : Kripke) : TV :=
   (Γ.map (fun f => f.evalHist h m)).fold conjTV TV.t
-scoped notation "⋀ₕ " h:max "," m:max ", " Γ:max => evalAntH Γ h m -/
+scoped notation "⋀ₕ " h:max "," m:max ", " Γ:max => Kripke.evalΓH Γ h m -/
 
-def evalAntB (Γ : Multiset Imp) (m : Kripke) : TV :=
-  (Γ.map (fun f => evalBlocked f m)).fold conjTV TV.t
-scoped notation "⋀* " m:max ", " Γ:max => evalAntB Γ m
+def Kripke.evalΘ (Θ : Multiset Imp) (m : Kripke) : TV :=
+  (Θ.map (fun f => evalBlocked f m)).fold conjTV TV.t
+scoped notation "⋀* " m:max ", " Θ:max => Kripke.evalΘ Θ m
 
 @[simp]
-theorem evalAntB0 : ⋀* m, 0 = TV.t := by simp [evalAntB]
+theorem Kripke.evalΘ_0 : ⋀* m, 0 = TV.t := by simp [Kripke.evalΘ]
 
-def evalSucc (Δ : Multiset Form) (m : Kripke) : TV :=
+def Kripke.evalSucc (Δ : Multiset Form) (m : Kripke) : TV :=
   (Δ.map (fun f => f.eval m)).fold disjTV TV.f
-scoped notation "⋁ " m:max ", " Γ:max => evalSucc Γ m
+scoped notation "⋁ " m:max ", " Γ:max => Kripke.evalSucc Γ m
 
 /- def evalSuccH (Δ : Multiset Form) (h : List Imp) (m : Kripke) : TV :=
   (Δ.map (fun f => f.evalHist h m)).fold disjTV TV.f
 scoped notation "⋁ₕ " h:max "," m:max ", " Γ:max => evalSuccH Γ h m -/
+def Kripke.evalH (h : List Imp) (m : Kripke) : TV :=
+  (h.map (λ f ↦ f.toForm.eval m)).foldl conjTV TV.t
 
 @[simp, grind]
-def Sequent.evalΓ : Sequent  → Kripke → TV
-| ⟨Γ, Θ, _ ⟩,  m => conjTV (evalAnt Γ m) (evalAntB Θ m)
+def Kripke.evalAnt : Sequent  → Kripke → TV
+| ⟨Γ, Θ, _ ⟩,  m => conjTV (Kripke.evalΓ Γ m) (Kripke.evalΘ Θ m)
 
 -- A sequent is refutable iff all its assumptions are satisfied (all forms in Γ are true) but none of the conclusions are (all Δ are false)
 
 @[grind]
 def Sequent.evalP : Sequent → Kripke → TV
 | s,  m =>
-  match evalAnt s.ant m, evalSucc s.Δ m with
+  match m.evalΓ s.ant, m.evalSucc s.Δ with
   | .t, .f => .f
   | .f, _ | _, .t => .t
   | _, _ => .u
@@ -253,7 +255,7 @@ def Sequent.evalP : Sequent → Kripke → TV
 @[grind]
 def Sequent.evalR : Sequent → List Imp → Kripke → TV
 | s, h, m =>
-  match s.evalΓ m, evalSucc s.Δ m with
+  match m.evalAnt s, m.evalSucc s.Δ with
   | .t, .f => .f
   | .f, _ | _, .t => .t
   | _, _ => .u
@@ -281,38 +283,38 @@ variable {s : Sequent}
 @[simp]
 theorem Sequent.evalP_true_iff :
   s.evalP m = TV.t ↔
-  evalAnt s.ant m = TV.f ∨ evalSucc s.Δ m = TV.t := by
+  Kripke.evalΓ s.ant m = TV.f ∨ Kripke.evalSucc s.Δ m = TV.t := by
   grind
 
 @[simp]
 theorem Sequent.evalP_false_iff :
   s.evalP m = TV.f ↔
-  evalAnt s.ant m = TV.t ∧ evalSucc s.Δ m = TV.f := by
+  Kripke.evalΓ s.ant m = TV.t ∧ Kripke.evalSucc s.Δ m = TV.f := by
   simp [Sequent.evalP]
   split <;> grind
 
 @[simp]
 theorem Sequent.evalR_true_iff :
   s.evalR h m = TV.t ↔
-  s.evalΓ m = TV.f ∨ evalSucc s.Δ m = TV.t := by
+  Kripke.evalAnt s m = TV.f ∨ Kripke.evalSucc s.Δ m = TV.t := by
   grind
 
 @[simp]
 theorem Sequent.evalR_false_iff :
   s.evalR h m = TV.f ↔
-  s.evalΓ m = TV.t ∧ evalSucc s.Δ m = TV.f := by
+  Kripke.evalAnt s m = TV.t ∧ Kripke.evalSucc s.Δ m = TV.f := by
   simp [Sequent.evalR]
   split <;> grind
 
 @[grind ., simp]
-lemma evalAnt_not_t (h : x ∈ ys) (hx : x.eval m = .u) : ¬evalAnt ys m = TV.t := by
+lemma Sequent.evalΓ_not_t (h : x ∈ ys) (hx : x.eval m = .u) : ¬Kripke.evalΓ ys m = TV.t := by
   induction ys using Multiset.induction with
   | empty => simp at h
   | cons y ys ih =>
     simp_all
     rcases h with (⟨⟨_⟩⟩ | h)
-    · simp_all [evalAnt]
-    · simp_all [evalAnt]
+    · simp_all [Kripke.evalΓ]
+    · simp_all [Kripke.evalΓ]
 
 @[grind ., simp]
 lemma evalSucc_not_f (h : x ∈ ys) (hx : x.eval m = .u) : ¬⋁ m, ys = TV.f := by
@@ -321,51 +323,51 @@ lemma evalSucc_not_f (h : x ∈ ys) (hx : x.eval m = .u) : ¬⋁ m, ys = TV.f :=
   | cons y ys ih =>
     simp_all
     rcases h with (⟨⟨_⟩⟩ | h)
-    · simp_all [evalSucc]
-    · simp_all [evalSucc]
+    · simp_all [Kripke.evalSucc]
+    · simp_all [Kripke.evalSucc]
 
-@[grind =, simp] lemma evalSucc_bot_cons : ⋁ m, ↑(⊥ :: xs) = ⋁ m, ↑xs := by simp [evalSucc]
+@[grind =, simp] lemma evalSucc_bot_cons : ⋁ m, ↑(⊥ :: xs) = ⋁ m, ↑xs := by simp [Kripke.evalSucc]
 --@[grind =, simp] lemma evalSuccH_bot_cons : ⋁ₕ h, m, ↑(⊥ :: xs) = ⋁ₕ h, m, ↑xs := by simp [evalSuccH, evalHist_bot]
-@[grind =, simp] lemma evalAnt_bot_cons : ⋀ m, ↑(⊥ :: xs) = .f := by simp [evalAnt]
-@[grind =, simp] lemma evalAnt_conj : ⋀ m, ↑((a ∧∧ b) :: xs) = ⋀ m, ↑(a :: b :: xs) := by simp [evalAnt]; grind
-@[grind =, simp] lemma evalSucc_conj : ⋁ m, ↑((a ∨∨ b) :: xs) = ⋁ m, ↑(a :: b :: xs) := by simp [evalSucc]; grind
+@[grind =, simp] lemma Sequent.evalΓ_bot_cons : ⋀ m, ↑(⊥ :: xs) = .f := by simp [Kripke.evalΓ]
+@[grind =, simp] lemma Sequent.evalΓ_conj : ⋀ m, ↑((a ∧∧ b) :: xs) = ⋀ m, ↑(a :: b :: xs) := by simp [Kripke.evalΓ]; grind
+@[grind =, simp] lemma evalSucc_conj : ⋁ m, ↑((a ∨∨ b) :: xs) = ⋁ m, ↑(a :: b :: xs) := by simp [Kripke.evalSucc]; grind
 --@[grind =, simp] lemma evalSuccH_conj : ⋁ₕ h, m, ↑((a ∨∨ b) :: xs) = ⋁ₕ h, m, ↑(a :: b :: xs) := by simp [evalSuccH, evalHist_or]; grind
-@[grind =, simp] lemma evalSucc_cons {xs : List Form} : ⋁ m, ↑(a :: xs) = disjTV (a.eval m) (⋁ m, ↑xs) := by simp [evalSucc]
-@[grind =, simp] lemma evalAnt_cons {xs : List Form} : ⋀ m, ↑(a :: xs) = conjTV (a.eval m) (⋀ m, ↑xs) := by simp [evalAnt]
+@[grind =, simp] lemma evalSucc_cons {xs : List Form} : ⋁ m, ↑(a :: xs) = disjTV (a.eval m) (⋁ m, ↑xs) := by simp [Kripke.evalSucc]
+@[grind =, simp] lemma Sequent.evalΓ_cons {xs : List Form} : ⋀ m, ↑(a :: xs) = conjTV (a.eval m) (⋀ m, ↑xs) := by simp [Kripke.evalΓ]
 
 @[grind =, simp]
-lemma evalAnt_eq_true :
+lemma Sequent.evalΓ_eq_true :
     ⋀ m, xs = .t ↔ ∀ x ∈ xs, x.eval m = .t := by
-  induction xs using Multiset.induction with simp_all [evalAnt]
+  induction xs using Multiset.induction with simp_all [Kripke.evalΓ]
 @[grind =, simp]
-lemma evalAnt_eq_false :
+lemma Sequent.evalΓ_eq_false :
     ⋀ m, xs = .f ↔ ∃ x ∈ xs, x.eval m = .f := by
-  induction xs using Multiset.induction with simp_all [evalAnt]
+  induction xs using Multiset.induction with simp_all [Kripke.evalΓ]
 @[grind =, simp]
-lemma evalAntB_eq_true :
+lemma Sequent.evalΘ_eq_true :
     ⋀* m, xs = .t ↔ ∀ x ∈ xs, evalBlocked x m = .t := by
-  induction xs using Multiset.induction with simp_all [evalAntB]
+  induction xs using Multiset.induction with simp_all [Kripke.evalΘ]
 @[grind =, simp]
-lemma evalAntB_eq_false :
+lemma Sequent.evalΘ_eq_false :
     ⋀* m, xs = .f ↔ ∃ x ∈ xs, evalBlocked x m = .f := by
-  induction xs using Multiset.induction with simp_all [evalAntB]
+  induction xs using Multiset.induction with simp_all [Kripke.evalΘ]
 @[grind =, simp]
 lemma evalSucc_eq_true :
     ⋁ m, xs = .t ↔ ∃ x ∈ xs, x.eval m = .t := by
-  induction xs using Multiset.induction with simp_all [evalSucc]
+  induction xs using Multiset.induction with simp_all [Kripke.evalSucc]
 @[grind =, simp]
 lemma evalSucc_eq_false :
     ⋁ m, xs = .f ↔ ∀ x ∈ xs, x.eval m = .f := by
-  induction xs using Multiset.induction with simp_all [evalSucc]
+  induction xs using Multiset.induction with simp_all [Kripke.evalSucc]
 @[grind ., simp]
-lemma evalSucc_true (fin : f ∈ Δ ) (ev : f.eval m = TV.t ): evalSucc Δ m = TV.t := by
- simp; grind
+lemma evalSucc_true (fin : f ∈ Δ ) (ev : f.eval m = TV.t ): Kripke.evalSucc Δ m = TV.t := by
+ simp; use f
 @[grind ., simp]
-lemma evalAnt_false (h₁ : f ∈ Γ) (h₂ : f.eval m = TV.f) : evalAnt Γ m = TV.f := by
-  simp; grind
+lemma evalΓ_false (h₁ : f ∈ Γ) (h₂ : f.eval m = TV.f) : Kripke.evalΓ Γ m = TV.f := by
+  simp; use f
 @[grind ., simp]
-lemma evalAntB_false (h₁ : f ∈ s.Θ) (h₂ : evalBlocked f m = TV.f) : s.evalΓ m = TV.f := by
-  simp; grind
+lemma evalΘ_false (h₁ : f ∈ Θ) (h₂ : evalBlocked f m = TV.f) : Kripke.evalΘ Θ m = TV.f := by
+  simp; use f, h₁;
 
 
 

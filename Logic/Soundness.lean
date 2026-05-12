@@ -21,8 +21,8 @@ theorem IG.soundness (s : Sequent) (p : IG s) :
     else if xtv' : x ∈ m.world.rejected then grind
     else grind
   | botl xs ys bl =>
-    have hAnt : evalAnt ({ Γ := ↑(⊥ :: xs), Θ := ↑bl, Δ := ↑ys } : Sequent).ant m = TV.f := by
-      apply evalAnt_false (f := ⊥)
+    have hAnt : Kripke.evalΓ ({ Γ := ↑(⊥ :: xs), Θ := ↑bl, Δ := ↑ys } : Sequent).ant m = TV.f := by
+      apply evalΓ_false (f := ⊥)
       · simp
       · simp
     grind

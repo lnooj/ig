@@ -146,9 +146,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                 have hpick' : imprA.1 = rows.map Sum.inr := by grind
                   --simpa [pickProof_eq_inr] using hpick
                 intro x hx
-                have hmem : toPick ⟨x, hx⟩ ∈ imprA.1 := by grind
-                  /- rw [imprA.2.2]
-                  exact List.mem_map.mpr ⟨⟨x, hx⟩, by simp, rfl⟩ -/
+                have hmem : toPick ⟨x, hx⟩ ∈ imprA.1 := by simp only [imprA.2.2, List.mem_map, List.mem_attach, true_and, exists_apply_eq_apply]
                 rw [hpick'] at hmem
                 cases hmk : mkImpRApp ⟨x, hx⟩ with
                 | inl pf => grind
