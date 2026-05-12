@@ -1,4 +1,4 @@
-{"version": "1.2.0",
+{"version": "1.1.0",
  "packagesDir": "../.lake/packages",
  "packages":
  [{"url": "https://github.com/leanprover-community/mathlib4",
@@ -149,5 +149,4 @@
    "inherited": true,
    "configFile": "lakefile.lean"}],
  "name": "docbuild",
- "lakeDir": ".lake",
- "fixedToolchain": false}
+ "lakeDir": ".lake"}
