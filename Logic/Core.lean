@@ -22,12 +22,6 @@ structure Imp where
   g : Form
 deriving DecidableEq, Repr
 
-@[grind]
-structure ImpB where
-  f : Form
-  g : Form
-deriving DecidableEq, Repr
-
 -- such notation is used as not to confuse with Lean's internal logic notation
 notation "⊥" => Form.bot
 infixl:50 " ∧∧ " => Form.and
@@ -42,7 +36,6 @@ def Form.neg (a : Form) : Form :=  a ⊃ ⊥
 def Imp.toForm (i : Imp) : Form := i.f ⊃ i.g
 
 
--- Using Multisets to not worry about order of forms
 @[grind, ext]
 structure Sequent where
   Γ : Multiset Form
@@ -56,7 +49,7 @@ def Sequent.ant (s : Sequent) := s.Γ ∪ s.Θ.map Imp.toForm
 /-
 Seq4Proof is needed to seperate the purely atomic formulas from the rest in antecedent.
 This is required for easier algorithmic approach, where we can one by one open up the more complex formulas.
-[x, y], [f1, f2], nonusable[imp1, imp2] ⊢ [x, y], [g1, g2], rightImp[imp1,imp2], used[imp1, imp2]
+[p, q], [A, B], [A₁ ⊃* B₁, A₂ ⊃* B₂] ⊢ [p, q], [A, B], [A₁ ⊃ B₁, A₂ ⊃ B₂], [Aₓ⊃ Bₓ]
  -/
 @[grind]
 structure Seq4Proof where
@@ -68,10 +61,8 @@ structure Seq4Proof where
   impR : List Imp
   hist : List Imp
 
-/-
-  Ordering formulas is more tricky since we are dealing with tree-like structures
-  We encode them into lists of nats
--/
+
+/- # Encoding for Multiset → List -/
 @[simp]
 def Form.encode : Form → List Nat
   | bot        => [0]
@@ -125,10 +116,7 @@ lemma Imp.ext {a b : Imp} (h : a.encode = b.encode) : a = b := by
   apply form_inj
   simp_all
 
-/-
-  We can give a canonical ordering to `Form`s using our encodings
-  Our definition of ordering is this: `f ≤ g ↔ Form.encode f ≤ Form.encode g`
--/
+
 instance : LinearOrder Form :=
   LinearOrder.lift' Form.encode (fun _ _ h => form_inj h)
 
@@ -141,10 +129,6 @@ instance : LinearOrder Imp :=
 def example1 : Multiset Nat := {3, 1, 2, 2}
 def example2 : Multiset Form := {.atom ( Atom.mk 1), .bot, .bot}
 
-/-
-   We can turn multisets into (computable) sorted lists with `sort`
-   But `sort` needs a relation with respect to which it will sort the elements on the multiset
--/
 
 #eval Multiset.sort example1 LE.le
 #eval Multiset.sort example2 LE.le

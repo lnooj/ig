@@ -15,6 +15,7 @@ inductive IG : Sequent → Type
   | botl :
     ∀ (xs ys : List Form) (bl : List Imp),
       IG ⟨↑(⊥ :: xs), ↑bl, ↑ys⟩
+  /-- ∀ Δ Γ, (Γ ⊢ Δ) → (Γ ⊢ ⊥, Δ) -/
   | botr :
     ∀ (xs ys : List Form) (bl : List Imp),
       IG ⟨↑xs, ↑bl, ↑ys⟩ →

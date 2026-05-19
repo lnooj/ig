@@ -10,29 +10,22 @@ theorem List.prodcut_eq_nil {α β : Type u} {xs : List α} {ys : List β} :
 namespace multiSucc
 open multiSucc
 
---deriving Repr
 open IG
 open RIG
---give sequent, hist, blocked
+
+/-- List IG or List RIG-/
 inductive Result (s : Sequent) (h : List Imp) where
 | proof (ps : List (IG s)) : ps ≠ [] → Result s h
 | refutation (rf : List (RIG s h)) : rf ≠ []  → Result s h
 
-def Result.proofs : Result s h → List (IG s )
-| .proof pf _ => pf
-| _ => []
-
-def Result.refutations : Result s h → List (RIG s h)
-| .refutation rs _ => rs
-| _ => []
-
-
+/-- Transform one sequents proof to another given that the sequents are equal.-/
 def IG.castSeq (x : IG ⟨a₁, b₁, c₁⟩)
     (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
     (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
     (hc : c₁ = c₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
     IG ⟨a₂, b₂, c₂⟩ := by subst_eqs; assumption
 
+/-- Transform list of sequent proofs to another given that the sequents are equal.-/
 def IG.castSeqList (x : List (IG ⟨a₁, b₁, c₁⟩))
     (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
     (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
@@ -42,6 +35,7 @@ def IG.castSeqList (x : List (IG ⟨a₁, b₁, c₁⟩))
 @[simp, grind =]
 theorem IG.castSeqList_eq_nil : IG.castSeqList x ha hb = [] ↔ x = [] := by subst_eqs; simp [castSeqList]
 
+/-- Transform one sequents refutation to another given that the sequents are equal.-/
 def RIG.castSeq (x :  RIG ⟨a₁, b₁, c₁⟩ h)
     (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
     (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
@@ -49,6 +43,7 @@ def RIG.castSeq (x :  RIG ⟨a₁, b₁, c₁⟩ h)
     (hh : h = h' := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
     RIG ⟨a₂, b₂, c₂⟩ h' := by subst_eqs; exact x
 
+/-- Transform list of sequent refutations to another given that the sequents are equal.-/
 def RIG.castSeqList (x : List (RIG ⟨a₁, b₁, c₁⟩ h))
     (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
     (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
@@ -59,6 +54,7 @@ def RIG.castSeqList (x : List (RIG ⟨a₁, b₁, c₁⟩ h))
 @[simp, grind =]
 theorem RIG.castSeqList_eq_nil : RIG.castSeqList x ha hb bb hh = [] ↔ x = [] := by subst_eqs; simp [castSeqList]
 
+/-- Transform result of a sequent to another given that the sequents are equal.-/
 def Result.castSeq (x : Result ⟨a₁, b₁, c₁⟩ h)
   (ha : a₁ = a₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
   (hb : b₁ = b₂ := by first | rfl | simp only [Multiset.coe_eq_coe]; grind)
@@ -66,7 +62,7 @@ def Result.castSeq (x : Result ⟨a₁, b₁, c₁⟩ h)
   (hh : h = h' := by first | rfl | simp only [Multiset.coe_eq_coe]; grind) :
   Result ⟨a₂, b₂, c₂⟩ h' := by subst_eqs; exact x
 
-
+/-- Map the IG and RIG one-premise rules premises to the result to get the conclusion types-/
 def Result.map
   (r : Result s h)
   (h' : List Imp)
@@ -77,6 +73,7 @@ def Result.map
   | .proof ps _ => .proof (ps.map f₁) (by simpa)
   | .refutation rs _ => .refutation (rs.map f₂) (by simpa)
 
+/-- Map the IG two-premise rules premises to the result to get the conclusion types-/
 def Result.map2proof (r₁ : Result s1 h1) (r₂ : Result s2 h2)
   (fproof : (IG s1) →
            (IG s2) →
@@ -89,4 +86,4 @@ def Result.map2proof (r₁ : Result s1 h1) (r₂ : Result s2 h2)
   | .refutation  rs _, _ => .refutation (rs.map ref₁) (by simpa)
   | _, .refutation rs _ => .refutation (rs.map ref₂) (by simpa)
 
-#min_imports
+end multiSucc

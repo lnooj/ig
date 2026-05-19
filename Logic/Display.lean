@@ -37,11 +37,14 @@ instance : ToString World where
 def indent (n : Nat) (s : String) : String :=
   String.intercalate "\n" (s.splitOn "\n" |>.map (fun line => (String.join (List.replicate n "  "))++ line))
 
-def mToString : Kripke → String
-| ⟨w, []⟩ => toString w
-| ⟨w, bs⟩ =>
-  let bstrs := bs.map mToString
-  toString w ++ "\n " ++ indent 0 (String.intercalate "  |  " bstrs)
+def mToStringAux : Nat → Kripke → String
+| indentLvl, ⟨w, []⟩ => indent indentLvl (toString w)
+| indentLvl, ⟨w, bs⟩ =>
+  let bstrs := bs.map (mToStringAux (indentLvl + 1))
+  String.intercalate "\n" (indent indentLvl (toString w) :: bstrs)
+
+def mToString (m : Kripke) : String :=
+  mToStringAux 0 m
 
 
 instance : ToString Kripke where

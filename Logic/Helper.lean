@@ -135,7 +135,43 @@ theorem Subtype.prop_map
               ({ f := a, g := b } :: hist)) // rf ≠ [] }) : [] ∉ rfs.unattach := by
   simp_all only [ne_eq, List.mem_unattach, not_true_eq_false, IsEmpty.exists_iff, not_false_eq_true]
 
+abbrev ImpRRefut (hist block : List Imp) (as : List Atom) : Type :=
+  (a : Form) × (b : Form) ×
+    RIG
+      { Γ := ↑(a :: List.map Form.atom as ++ List.map Imp.toForm block), Θ := ∅, Δ := {b} }
+      ({ f := a, g := b } :: hist)
 
+abbrev ImpRRow (impR hist block : List Imp) (as : List Atom)
+    (u : {i : Imp // i ∈ impR}) : Type :=
+  { rf : List (ImpRRefut hist block as) //
+    rf ≠ [] ∧ ∀ t ∈ rf, t.1 = u.1.f ∧ t.2.1 = u.1.g }
+
+@[grind ., simp]
+theorem mem_of_mem_choices_tagged
+  (impR hist block : List Imp)
+  (as : List Atom)
+  (rows : List (Σ u : {i : Imp // i ∈ impR}, ImpRRow impR hist block as u))
+  (hrows :
+    ∀ (x : Imp) (hx : x ∈ impR),
+      ∃ rw : ImpRRow impR hist block as ⟨x, hx⟩,
+        (⟨⟨x, hx⟩, rw⟩ :
+          Σ u : {i : Imp // i ∈ impR}, ImpRRow impR hist block as u) ∈ rows)
+  {c : List (ImpRRefut hist block as)}
+  {x : Imp}
+  (hx : x ∈ impR)
+  (hc : c ∈ multiSucc.choices (rows.map (fun tr => tr.2.1))) :
+  ∃ r', ⟨x.f, x.g, r'⟩ ∈ c := by
+  obtain ⟨row, hrow⟩ := hrows x hx
+  have hrow' : row.1 ∈ rows.map (fun tr => tr.2.1) := by
+    exact List.mem_map.mpr ⟨⟨⟨x, hx⟩, row⟩, hrow, rfl⟩
+  obtain ⟨t, htrow, htc⟩ := mem_of_mem_choices hc hrow'
+  rcases t with ⟨a, b, r'⟩
+  have htag := row.2.2 ⟨a, b, r'⟩ htrow
+  simp at htag
+  rcases htag with ⟨ha, hb⟩
+  subst a
+  subst b
+  exact ⟨r', htc⟩
 
 end multiSucc
 

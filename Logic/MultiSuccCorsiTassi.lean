@@ -5,6 +5,9 @@ import Logic.Result
 import Logic.Termination
 import Logic.Helper
 
+import Logic.Kripke
+import Logic.Completeness
+
 
 namespace multiSucc
 open multiSucc
@@ -12,44 +15,6 @@ open multiSucc
 --deriving Repr
 open IG
 open RIG
-
-abbrev ImpRRefut (hist block : List Imp) (as : List Atom) : Type :=
-  (a : Form) × (b : Form) ×
-    RIG
-      { Γ := ↑(a :: List.map Form.atom as ++ List.map Imp.toForm block), Θ := ∅, Δ := {b} }
-      ({ f := a, g := b } :: hist)
-
-abbrev ImpRRow (impR hist block : List Imp) (as : List Atom)
-    (u : {i : Imp // i ∈ impR}) : Type :=
-  { rf : List (ImpRRefut hist block as) //
-    rf ≠ [] ∧ ∀ t ∈ rf, t.1 = u.1.f ∧ t.2.1 = u.1.g }
-
-@[grind ., simp]
-theorem mem_of_mem_choices_tagged
-  (impR hist block : List Imp)
-  (as : List Atom)
-  (rows : List (Σ u : {i : Imp // i ∈ impR}, ImpRRow impR hist block as u))
-  (hrows :
-    ∀ (x : Imp) (hx : x ∈ impR),
-      ∃ rw : ImpRRow impR hist block as ⟨x, hx⟩,
-        (⟨⟨x, hx⟩, rw⟩ :
-          Σ u : {i : Imp // i ∈ impR}, ImpRRow impR hist block as u) ∈ rows)
-  {c : List (ImpRRefut hist block as)}
-  {x : Imp}
-  (hx : x ∈ impR)
-  (hc : c ∈ multiSucc.choices (rows.map (fun tr => tr.2.1))) :
-  ∃ r', ⟨x.f, x.g, r'⟩ ∈ c := by
-  obtain ⟨row, hrow⟩ := hrows x hx
-  have hrow' : row.1 ∈ rows.map (fun tr => tr.2.1) := by
-    exact List.mem_map.mpr ⟨⟨⟨x, hx⟩, row⟩, hrow, rfl⟩
-  obtain ⟨t, htrow, htc⟩ := mem_of_mem_choices hc hrow'
-  rcases t with ⟨a, b, r'⟩
-  have htag := row.2.2 ⟨a, b, r'⟩ htrow
-  simp at htag
-  rcases htag with ⟨ha, hb⟩
-  subst a
-  subst b
-  exact ⟨r', htc⟩
 
 
 /- METARULES
@@ -63,8 +28,8 @@ theorem mem_of_mem_choices_tagged
    - so when applying L→ , we place the copy of form to usedImp list on the left
      and continue until all forms and imps have been looked at. When encountering R→ , we move all imps from Used list back to imp list
 
-4. -our own- kõik mittepööratavad reeglid tuleb panna kõrvale ja jõuda pööratavate reeglite kasutusel kas aksioomini
-   või küllastunud sekventsini, alles siis vaadata mittepööratavaid reegleid. So left side imps go straight to imps₁
+4. -our own- all non-invertible rules (R ⊃) must be pushed to the end
+    until either AX case is reached or the sequent is saturated
  -/
 
 
@@ -78,7 +43,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
     | [] =>
       match fR with
       | [] => -- succedent only has atom left --
-        match common : aL ∩ aR with --CHANGED
+        match common : aL ∩ aR with
         -- no common atoms
         | [] =>
           if h : impR = [] then by
@@ -86,7 +51,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
             simp [Seq4Proof.toSeq, List.append_nil]
             let rule := [ax hist aL aR block (by grind)]
             exact Result.refutation rule (by grind)
-          --METARULE 1 NONINVERTABLE REEGEL
+          --METARULE 1 and 3
           else by
             simp only [Seq4Proof.toSeq, List.append_nil]
 
@@ -143,8 +108,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
                     ∃ rw : row ⟨x, hx⟩,
                       (⟨⟨x, hx⟩, rw⟩ :
                         Σ u : {i : Imp // i ∈ impR}, row u) ∈ rows := by
-                have hpick' : imprA.1 = rows.map Sum.inr := by grind
-                  --simpa [pickProof_eq_inr] using hpick
+                have hpick' : imprA.1 = rows.map Sum.inr := by simpa [pickProof_eq_inr] using hpick
                 intro x hx
                 have hmem : toPick ⟨x, hx⟩ ∈ imprA.1 := by simp only [imprA.2.2, List.mem_map, List.mem_attach, true_and, exists_apply_eq_apply]
                 rw [hpick'] at hmem
@@ -206,7 +170,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
         have ruleP := orr a b xs ys block; have ruleR := orr hist a b xs ys block
         (premise.castSeq.map hist ruleP ruleR).castSeq
 
-      | (.imp a b) :: succForms =>  --METARULE 2 apply afort only when R→ has been used (if it is in usedImps₂. else: läheb imps listi)
+      | (.imp a b) :: succForms =>  --METARULE 2 apply afort only when R→ has been used (if it is in usedImps₂. else: goes to impR to be opened up later)
         if inc : ⟨a,b⟩ ∈ hist then
           have premise := automatedProof ⟨aL, [], block, aR, b :: succForms, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
           let xs := aL.map .atom; let ys := (aR.map .atom) ++ succForms ++ (impR.map Imp.toForm)
@@ -238,7 +202,7 @@ def automatedProof (s : Seq4Proof) (cap : ℕ )
       have ruleP := orl a b xs ys block
       have ruleR₁ := orl₁ hist a b xs ys block; have ruleR₂ := orl₂ hist a b xs ys block
       (Result.map2proof premise₁.castSeq premise₂.castSeq ruleP ruleR₁ ruleR₂).castSeq
-
+    -- METARULE 1: add copy to block list
     | (.imp a b) :: antForms =>
       have premise₁ := automatedProof ⟨aL, antForms, ⟨a, b⟩ :: block, aR, a::fR, impR, hist⟩ cap
       have premise₂ := automatedProof ⟨aL, b::antForms, block, aR, fR, impR, hist⟩ cap (by simp at *; apply le_trans (Finset.card_le_card ?_) hcap; grind)
@@ -285,7 +249,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
   match res with
   | .proof ps _ =>  dbg_trace s!"have proof {ps.length}"; String.toFormat (listProofToString ps)
-  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf /- ++ listModelToString (rf.map (λ r ↦ r.getCM)) -/)
+  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf ++ listKripkeToString (rf.map (λ r ↦ r.getCM)))
 
 --modusponens "a → b, a ⊢ β"
 #eval! automatedProofHelper (seq {(p ⊃ q), p ⊢ q})

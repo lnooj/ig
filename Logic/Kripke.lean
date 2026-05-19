@@ -4,7 +4,7 @@ import Logic.Termination
 namespace multiSucc
 open multiSucc
 
-/-! # Kripke Semantics definitions -/
+/- # Kripke Semantics definitions -/
 structure World where
   forced : Finset Atom
   rejected : Finset Atom
@@ -16,13 +16,11 @@ structure Kripke where
   branch : List Kripke
 deriving BEq
 
---@[grind, simp]
 def Kripke.wf (m : Kripke) : Bool :=
 ∀ fm ∈ m.branch.attach,
   fm.val.wf ∧
   m.world.forced ⊆ fm.val.world.forced ∧
-  fm.val.world.rejected ⊆ m.world.rejected --∧
-  --Disjoint m.world.forced m.world.rejected
+  fm.val.world.rejected ⊆ m.world.rejected
 decreasing_by
 all_goals
   have : sizeOf m.branch < sizeOf m := by grind [Kripke]
@@ -57,7 +55,6 @@ lemma depth_lt_of_mem {m' m : Kripke} :
   simp [Kripke.depth_eq] at this
   omega
 
---@[grind, simp]
 def Kripke.all (m : Kripke) : List Kripke :=
   m :: m.branch.attach.flatMap (all ·.val)
 decreasing_by
@@ -432,11 +429,6 @@ theorem evalBlocked_imp_true_then {m m': Kripke}
   (child : m' ∈ m.branch)
   (h : evalBlocked x m = TV.t) : (x.f ⊃ x.g).eval m' = TV.t := by
   simp_all [evalBlocked_true_iff]
-
-theorem mmmmm {bl : List Imp} :
-  ∀ x ∈ bl, evalBlocked x m = TV.t →  ∀ x ∈ bl, (x.f ⊃ x.g).eval m' = TV.t := by sorry
---MONOTONICITY--
-
 
 
 /-! # Truth monotonicity -/
