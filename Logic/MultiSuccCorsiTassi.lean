@@ -6,7 +6,7 @@ import Logic.Termination
 import Logic.Helper
 
 import Logic.Kripke
-import Logic.Completeness
+--import Logic.Completeness
 
 
 namespace multiSucc
@@ -249,7 +249,7 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
   match res with
   | .proof ps _ =>  dbg_trace s!"have proof {ps.length}"; String.toFormat (listProofToString ps)
-  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf ++ listKripkeToString (rf.map (λ r ↦ r.getCM)))
+  | .refutation rf _ => dbg_trace s!"{rf.length}"; String.toFormat (listRefutationToString rf /- ++ listKripkeToString (rf.map (λ r ↦ r.getCM)) -/)
 
 --modusponens "a → b, a ⊢ β"
 #eval! automatedProofHelper (seq {(p ⊃ q), p ⊢ q})
@@ -258,6 +258,12 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 
 #eval! automatedProofHelper (seq {⊢ ((p ⊃ (p ⊃ q)) ⊃ (p ⊃ q))})
 #eval! automatedProofHelper (seq {p ⊢ (¬q ∨ p)})
+--demorgan
+#eval! automatedProofHelper (seq { ⊢ ((¬p ∨ ¬p) ⊃ ¬(p ∧ q))})
+#eval! automatedProofHelper (seq { ⊢ (¬(p ∨ q) ⊃ (¬p ∧ ¬p))})
+
+#eval! automatedProofHelper (seq { ⊢ ((¬p ∧ ¬p) ⊃ ¬(p ∨ q))})
+#eval! automatedProofHelper (seq { ⊢ (¬(p ∧ q) ⊃ (¬p ∨ ¬p))})
 
 #eval! automatedProofHelper (seq {((p ∨ q) ∧ r) ⊢ ((p ∧ r) ∨ (q ∧ r))})
 
@@ -271,6 +277,9 @@ def automatedProofHelper (s : Sequent) : Std.Format :=
 #eval! automatedProofHelper (seq {⊢ (((p ⊃ q )⊃ p) ⊃ p)})
 #eval! automatedProofHelper (seq {⊢ (p ∨ ¬p )})
 #eval! automatedProofHelper (seq {⊢ (((p ⊃ r) ⊃ p) ⊃ r)})
+#eval! automatedProofHelper (seq {⊢ (¬¬ ⊥ ⊃ p)})
+#eval! automatedProofHelper (seq {⊢ ((q ⊃ p) ⊃ (¬ p ⊃ ¬ q))})
+#eval! automatedProofHelper (seq {⊢ (p ⊃ ¬¬ p)})
 --#eval! evaluate (form {((¬ p ⊃ ¬ q) ⊃ (q ⊃ p))})
 #print axioms automatedProofHelper
 end multiSucc

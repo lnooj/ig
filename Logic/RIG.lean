@@ -67,8 +67,8 @@ inductive RIG : Sequent → (hs : List Imp) → Type
   | afort hs :
     ∀ (a b : Form) (xs ys : List Form) (bl : List Imp),
       (hhs : ⟨a, b⟩ ∈ hs) → --or (hhs : a ∈ hs.map .left) →
-      RIG ⟨↑(xs), ↑bl, ↑(b :: ys)⟩ hs →
-      RIG ⟨↑(xs), ↑bl, ↑((a ⊃ b) :: ys)⟩ hs
+      RIG ⟨↑xs, ↑bl, ↑(b :: ys)⟩ hs →
+      RIG ⟨↑xs, ↑bl, ↑((a ⊃ b) :: ys)⟩ hs
 
 
 end multiSucc

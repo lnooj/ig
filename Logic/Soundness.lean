@@ -82,9 +82,11 @@ theorem IG.soundness (s : Sequent) (p : IG s) :
 
   | afort a b xs ys bl prem ih =>
     simp
-    simp at ih
+    simp only [ne_eq, Sequent.evalP_false_iff, Sequent.ant, Imp.toForm, Sequent.evalΓ_eq_true,
+    Multiset.mem_coe, List.mem_map, evalSucc_eq_false, not_and, Multiset.map_coe, Multiset.mem_union] at ih
     intro h₁ h₂
     specialize ih m wf h₁
+    simp at ih
     apply_assumption
     apply imp_false_then_b_false h₂ wf
 

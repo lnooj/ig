@@ -1,6 +1,7 @@
 import Mathlib.Data.Multiset.Basic
 import Mathlib.Data.Multiset.Sort
 import Mathlib.Data.List.Lex
+import Mathlib.Data.Nat.Pairing
 
 namespace multiSucc
 
@@ -73,6 +74,76 @@ def Form.encode : Form → List Nat
 
 @[simp]
 def Imp.encode (x : Imp) : List Nat := x.toForm.encode
+
+--need encoding for Form → Atom and Atom → Form with proof of (f : Form) : f.toAtom.toForm = f
+/- def Form.toAtom (f : Form) : Atom := .mk f.encode.sum
+def Atom.toForm (a : Atom) : Form := sorry -/
+
+/- A separate reversible coding of formulas as atoms. -/
+def Form.code : Form → Nat
+  | bot        => Nat.pair 0 0
+  | atom a     => Nat.pair 1 a.atom
+  | and f g    => Nat.pair 2 (Nat.pair f.code g.code)
+  | or f g     => Nat.pair 3 (Nat.pair f.code g.code)
+  | imp f g    => Nat.pair 4 (Nat.pair f.code g.code)
+
+lemma codePayload_lt_pair_of_pos (tag payload : Nat) (htag : 0 < tag) :
+    payload < Nat.pair tag payload := by
+  exact lt_of_lt_of_le (Nat.lt_add_of_pos_left htag) (Nat.add_le_pair tag payload)
+
+set_option linter.unusedVariables false in
+def Form.decode (n : Nat) : Form :=
+  match h : Nat.unpair n with
+  | (0, _) => bot
+  | (1, a) => atom (.mk a)
+  | (2, p) =>
+    match hp : Nat.unpair p with
+    | (f, g) => and (decode f) (decode g)
+  | (3, p) =>
+    match hp : Nat.unpair p with
+    | (f, g) => or (decode f) (decode g)
+  | (4, p) =>
+    match hp : Nat.unpair p with
+    | (f, g) => imp (decode f) (decode g)
+  | (_, _) => bot
+termination_by n
+decreasing_by
+  all_goals
+    have hp_lt : p < n := by
+      rw [← Nat.pair_eq_of_unpair_eq h]
+      exact codePayload_lt_pair_of_pos _ _ (by omega)
+    first
+    | exact lt_of_le_of_lt (by simpa [hp] using Nat.unpair_left_le p) hp_lt
+    | exact lt_of_le_of_lt (by simpa [hp] using Nat.unpair_right_le p) hp_lt
+
+theorem Form.decode_code (f : Form) : Form.decode f.code = f := by
+  induction f with
+  | bot =>
+      rw [Form.decode, Form.code, Nat.unpair_pair]
+  | atom a =>
+      rw [Form.decode, Form.code, Nat.unpair_pair]
+  | and f g ihf ihg =>
+      rw [Form.decode, Form.code, Nat.unpair_pair]
+      simp only [Nat.unpair_pair, ihf, ihg]
+  | or f g ihf ihg =>
+      rw [Form.decode, Form.code, Nat.unpair_pair]
+      simp only [Nat.unpair_pair, ihf, ihg]
+  | imp f g ihf ihg =>
+      rw [Form.decode, Form.code, Nat.unpair_pair]
+      simp only [Nat.unpair_pair, ihf, ihg]
+
+
+def Form.toAtom (f : Form) : Atom := .mk f.code
+def Atom.toForm (a : Atom) : Form := Form.decode a.atom
+
+theorem Form.toAtom_toForm (f : Form) :
+    f.toAtom.toForm = f := by
+  exact Form.decode_code f
+
+theorem Form.toAtom_injective : Function.Injective Form.toAtom := by
+  intro f g h
+  have hform := congrArg Atom.toForm h
+  simpa [Form.toAtom_toForm] using hform
 
 lemma Atom.ext {a b : Atom} (h : a.atom = b.atom) : a = b := by
   cases a; cases b

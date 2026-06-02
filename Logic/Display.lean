@@ -77,42 +77,42 @@ def proofToString  {xseq : Sequent} (indentLvl : Nat) : IG xseq → String
 | .ax _ xs ys bl _ _=>
   indent indentLvl s!"AX: {Γ.ToString xs bl} ⊢ {listToString ys}"
 | .botl xs ys bl =>
-  indent indentLvl s!"⊥L: ⊥, {Γ.ToString xs bl} ⊢ {listToString ys}"
+  indent indentLvl s!"L⊥: ⊥, {Γ.ToString xs bl} ⊢ {listToString ys}"
 | .botr xs ys bl proof =>
   let premise := proofToString (indentLvl + 1) proof
   let ruleLine :=
-  s!"⊥R: {Γ.ToString xs bl} ⊢ ⊥, {listToString ys}"
+  s!"R⊥: {Γ.ToString xs bl} ⊢ ⊥, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .andl a b xs ys bl proof =>
   let premise := proofToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L: ({a} ∧ {b}), {Γ.ToString xs bl} ⊢ {listToString ys}"
+  let ruleLine := s!"L∧: ({a} ∧ {b}), {Γ.ToString xs bl} ⊢ {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .andr a b xs ys bl proof₁ proof₂=>
   let left := proofToString  (indentLvl + 1) proof₁
   let right := proofToString (indentLvl + 1) proof₂
-  let ruleLine := s!"∧R: {Γ.ToString xs bl} ⊢ {a} ∧ {b}, {listToString ys}"
+  let ruleLine := s!"R∧: {Γ.ToString xs bl} ⊢ {a} ∧ {b}, {listToString ys}"
   s!"{left}\n{right}\n{indent indentLvl (horizontalLine (ruleLine.length))}\n{indent indentLvl ruleLine}"
 | .orl a b xs ys bl proof₁ proof₂=>
   let left := proofToString  (indentLvl + 1) proof₁
   let right := proofToString (indentLvl + 1) proof₂
-  let ruleLine := s!"∨L: ({a} ∨ {b}), {Γ.ToString xs bl} ⊢ {listToString ys}"
+  let ruleLine := s!"L∨: ({a} ∨ {b}), {Γ.ToString xs bl} ⊢ {listToString ys}"
   s!"{left}\n{right}\n{horizontalLine (ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .orr a b xs ys bl proof =>
   let premise := proofToString (indentLvl + 1) proof
-  let ruleLine := s!" ∨R: {Γ.ToString xs bl} ⊢ {a} ∨ {b}, {listToString ys}"
+  let ruleLine := s!" R∨: {Γ.ToString xs bl} ⊢ {a} ∨ {b}, {listToString ys}"
   s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impl a b xs ys bl proof₁ proof₂ =>
   let left  := proofToString (indentLvl + 1) proof₁
   let right := proofToString (indentLvl + 1) proof₂
-  let ruleLine := s!"→L: ({a} → {b}), {Γ.ToString xs bl}⊢ {listToString ys}"
+  let ruleLine := s!"L⊃: ({a} ⊃ {b}), {Γ.ToString xs bl}⊢ {listToString ys}"
   s!"{left}\n{right}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impr a b xs ys bl proof  =>
   let premise := proofToString (indentLvl + 1) proof
-  let ruleLine := s!"→R: {Γ.ToString xs bl} ⊢ {a} → {b}, {listToString ys}"
+  let ruleLine := s!"R⊃: {Γ.ToString xs bl} ⊢ {a} ⊃ {b}, {listToString ys}"
   s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .afort a b xs ys bl proof  =>
   let premise := proofToString (indentLvl + 1) proof
-  let ruleLine := s!"→AF: {Γ.ToString xs bl} ⊢ {a} → {b}, {listToString ys}"
+  let ruleLine := s!"AF: {Γ.ToString xs bl} ⊢ {a} ⊃ {b}, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 
 def listProofToString : List (IG xseq) → String
@@ -136,46 +136,46 @@ def refutationToString  {xseq : Sequent} {h : List Imp} (indentLvl : Nat) : RIG 
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .andl h a b xs ys bl proof =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L: {a} ∧ {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
+  let ruleLine := s!"L∧: {a} ∧ {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .andr₁ h a b xs ys bl proof =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L₁: {Γ.ToString xs bl} ⊬ {a} ∧ {b}, {listToString ys}"
+  let ruleLine := s!"L₁∧: {Γ.ToString xs bl} ⊬ {a} ∧ {b}, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .andr₂ h a b xs ys bl proof =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"∧L₂: {Γ.ToString xs bl} ⊬ {a} ∧ {b}, {listToString ys}"
+  let ruleLine := s!"L₂∧: {Γ.ToString xs bl} ⊬ {a} ∧ {b}, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .orl₁ h a b xs ys bl proof =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!" ∨R₁: {a} ∨ {b}, {Γ.ToString xs bl} ⊬  {listToString ys}"
+  let ruleLine := s!" R₁∨: {a} ∨ {b}, {Γ.ToString xs bl} ⊬  {listToString ys}"
   s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .orl₂ h a b xs ys bl proof =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!" ∨R₂: {a} ∨ {b}, {Γ.ToString xs bl} ⊬  {listToString ys}"
+  let ruleLine := s!" R₂∨: {a} ∨ {b}, {Γ.ToString xs bl} ⊬  {listToString ys}"
   s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .orr h a b xs ys bl proof =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!" ∨R: {Γ.ToString xs bl} ⊬ {a} ∨ {b}, {listToString ys}"
+  let ruleLine := s!" R∨: {Γ.ToString xs bl} ⊬ {a} ∨ {b}, {listToString ys}"
   s!"{ premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impl₁ h a b xs ys bl proof =>
   let premise  := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→L₁: {a} ⊃ {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
+  let ruleLine := s!"L₁⊃: {a} ⊃ {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impl₂ h a b xs ys bl proof =>
   let premise  := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→L₂: {a} ⊃ {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
+  let ruleLine := s!"L₂⊃: {a} ⊃ {b}, {Γ.ToString xs bl} ⊬ {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .impr h as bs ys bl _ proof  =>
   let premises :=
     ys.attach.map (fun imp =>
       match imp with
       | ⟨⟨a, b⟩, hmem⟩ => refutationToString (indentLvl + 1) (proof a b hmem))
-  let ruleLine := s!"→R: {listToString (as.map .atom) ++ listToStringB bl} ⊬ {listToString (bs.map .atom) ++ listToString (ys.map Imp.toForm)}"
+  let ruleLine := s!"R⊃: {listToString (as.map .atom) ++ listToStringB bl} ⊬ {listToString (bs.map .atom) ++ listToString (ys.map Imp.toForm)}"
   s!"{String.intercalate "\n" premises}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 | .afort h a b xs ys bl _ proof  =>
   let premise := refutationToString (indentLvl + 1) proof
-  let ruleLine := s!"→AF: {Γ.ToString xs bl} ⊬ {a} ⊃ {b}, {listToString ys}"
+  let ruleLine := s!"AF: {Γ.ToString xs bl} ⊬ {a} ⊃ {b}, {listToString ys}"
   s!"{premise}\n{indent indentLvl (horizontalLine ruleLine.length)}\n{indent indentLvl ruleLine}"
 
 def listRefutationToString : List (RIG xseq h) → String
