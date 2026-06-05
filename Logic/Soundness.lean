@@ -1,9 +1,6 @@
 import Logic.Core
---import Logic.Syntax
 import Logic.Helper
---import Logic.Display
 import Logic.Kripke
---import Logic.MultiSuccCorsiTassi
 import Logic.IG
 
 namespace multiSucc

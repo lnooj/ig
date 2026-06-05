@@ -4,8 +4,8 @@ import Logic.Kripke
 namespace multiSucc
 open multiSucc
 
+/-- Only left side of implications need to be evaluated-/
 def Hist.getLeft (h : List Imp) : List Form := h.map (λ i ↦ i.f)
-
 
 @[simp, grind]
 def RIG.getCM (ref : RIG s h) :  Kripke :=
@@ -38,11 +38,6 @@ theorem RIG.ant_atom_forced (r : RIG s h)
 theorem RIG.ant_atom_rejected (r : RIG s h)
   (ha : Form.atom a ∈ s.Δ) : a ∈ r.getCM.world.rejected := by
   induction r generalizing a <;> simp_all  [RIG.getCM]
-
-/- def Result.getCMs (r : Result s b h) : List Kripke :=
-match r with
-| refutation rfs _ => rfs.map (λ rf ↦ RIG.getCM rf )
-| _ => [] -/
 
 @[simp, grind =]
 theorem RIG.cm_wf (r : RIG s h) : r.getCM.wf := by
@@ -77,7 +72,6 @@ lemma RIG.impr_mono (i : Imp) (impH : i ∈ ys)
   intro a ah
   specialize h a ah
   grind only [Kripke.momo_branch_true, impr_cm_branch]
-
 
 
 theorem RIG.completenessH {s : Sequent} (r : RIG s h)
